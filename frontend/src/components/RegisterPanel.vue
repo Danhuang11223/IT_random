@@ -32,8 +32,8 @@ async function submit() {
 <template>
   <section class="panel auth-panel wide-panel">
     <div class="panel-heading">
-      <h2>注册</h2>
-      <p>创建新账号后会自动登录并进入控制台。</p>
+      <h2>Create account</h2>
+      <p>Set up a new account and start right away.</p>
     </div>
 
     <form class="stack" @submit.prevent="submit">
@@ -42,7 +42,7 @@ async function submit() {
       </p>
 
       <label class="field">
-        <span>用户名</span>
+        <span>Username</span>
         <input
           v-model="form.username"
           type="text"
@@ -55,7 +55,7 @@ async function submit() {
       </label>
 
       <label class="field">
-        <span>邮箱（可选）</span>
+        <span>Email (optional)</span>
         <input
           v-model="form.email"
           type="email"
@@ -68,7 +68,7 @@ async function submit() {
       </label>
 
       <label class="field">
-        <span>密码</span>
+        <span>Password</span>
         <input
           v-model="form.password"
           type="password"
@@ -81,7 +81,7 @@ async function submit() {
       </label>
 
       <button class="primary-button" :disabled="state.busy.auth">
-        {{ state.busy.auth ? "提交中..." : "注册并进入" }}
+        {{ state.busy.auth ? "Creating..." : "Create account" }}
       </button>
     </form>
   </section>

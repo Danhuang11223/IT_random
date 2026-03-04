@@ -40,7 +40,7 @@ button {
 
 .root-shell {
   min-height: 100vh;
-  padding: 24px 0 56px;
+  padding: 20px 0 44px;
 }
 
 .notice-stack {
@@ -57,13 +57,13 @@ button {
 
 .auth-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
-  gap: 22px;
+  grid-template-columns: minmax(280px, 400px) minmax(0, 560px);
+  gap: 18px;
   align-items: stretch;
 }
 
 .auth-showcase {
-  padding: 30px;
+  padding: 26px;
   border-radius: 30px;
   background:
     linear-gradient(140deg, rgba(28, 107, 105, 0.95), rgba(16, 57, 68, 0.96)),
@@ -71,7 +71,7 @@ button {
   color: #f3f2ec;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
   box-shadow: 0 24px 54px rgba(16, 57, 68, 0.18);
 }
 
@@ -90,10 +90,16 @@ button {
   color: rgba(243, 242, 236, 0.84);
 }
 
+.showcase-note {
+  margin: -2px 0 0;
+  color: rgba(255, 236, 204, 0.92);
+  font-weight: 600;
+}
+
 .showcase-points {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .showcase-chip {
@@ -114,12 +120,23 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 14px;
+  padding: 11px 16px;
   border-radius: 999px;
   color: #f3f2ec;
   text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.auth-cta-primary {
+  background: rgba(255, 236, 204, 0.18);
+  border-color: rgba(255, 236, 204, 0.22) !important;
+  box-shadow: 0 10px 24px rgba(6, 28, 35, 0.2);
+}
+
+.auth-cta-secondary {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: rgba(243, 242, 236, 0.92) !important;
 }
 
 .auth-nav a.router-link-active {
@@ -130,6 +147,7 @@ button {
 .auth-stage {
   display: grid;
   align-items: center;
+  justify-items: start;
 }
 
 .eyebrow {
@@ -255,8 +273,9 @@ button {
 
 .single-column {
   display: grid;
-  gap: 18px;
-  max-width: 760px;
+  gap: 10px;
+  width: min(100%, 540px);
+  max-width: 540px;
 }
 
 .history-flow {
@@ -264,7 +283,7 @@ button {
 }
 
 .panel {
-  padding: 22px;
+  padding: 20px;
   border: 1px solid rgba(23, 38, 47, 0.08);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.82);
@@ -278,7 +297,7 @@ button {
 }
 
 .wide-panel {
-  width: 100%;
+  width: min(100%, 540px);
 }
 
 .result-panel {
@@ -290,19 +309,36 @@ button {
   gap: 14px;
 }
 
+.auth-inline-row {
+  margin: 2px 2px 0;
+  color: #556872;
+  font-size: 0.92rem;
+}
+
+.auth-inline-link {
+  margin-left: 6px;
+  color: #1c6b69;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-inline-link:hover {
+  text-decoration: underline;
+}
+
 .panel-heading h2 {
   margin: 0;
   font-size: 1.35rem;
 }
 
 .panel-heading p {
-  margin: 8px 0 18px;
+  margin: 8px 0 14px;
   color: #51636d;
 }
 
 .stack {
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .stack.compact {
@@ -314,6 +350,26 @@ button {
   gap: 8px;
 }
 
+.form-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.section-kicker {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #1c3c4b;
+}
+
+.section-note {
+  margin: -4px 0 2px;
+  font-size: 0.84rem;
+  color: #667982;
+}
+
 .field span {
   font-size: 0.92rem;
   color: #435761;
@@ -323,7 +379,7 @@ button {
 .field select,
 .field textarea {
   width: 100%;
-  padding: 12px 14px;
+  padding: 10px 14px;
   border: 1px solid rgba(23, 38, 47, 0.14);
   border-radius: 14px;
   background: rgba(250, 248, 243, 0.96);
@@ -393,6 +449,27 @@ button {
   font-size: 0.9rem;
 }
 
+.why-card {
+  margin: 2px 0 2px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(23, 38, 47, 0.03);
+  border: 1px solid rgba(23, 38, 47, 0.06);
+}
+
+.why-card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+  color: #1c3c4b;
+}
+
+.why-card p {
+  margin: 0;
+  color: #51636d;
+  font-size: 0.92rem;
+}
+
 .mood-choice-list {
   display: grid;
   gap: 10px;
@@ -458,7 +535,7 @@ button {
 .tag-button {
   border: 0;
   border-radius: 999px;
-  padding: 12px 18px;
+  padding: 11px 18px;
   transition:
     transform 0.18s ease,
     box-shadow 0.18s ease,
@@ -476,6 +553,12 @@ button {
   color: #fff;
   background: linear-gradient(135deg, #1c6b69, #19514e);
   box-shadow: 0 12px 24px rgba(28, 107, 105, 0.22);
+}
+
+.generate-button {
+  width: 100%;
+  padding: 14px 20px;
+  font-weight: 700;
 }
 
 .ghost-button {

@@ -31,8 +31,8 @@ async function submit() {
 <template>
   <section class="panel auth-panel wide-panel">
     <div class="panel-heading">
-      <h2>登录</h2>
-      <p>用已有账号进入控制台并生成随机事件。</p>
+      <h2>Sign in</h2>
+      <p>Use your account to jump back in.</p>
     </div>
 
     <form class="stack" @submit.prevent="submit">
@@ -41,7 +41,7 @@ async function submit() {
       </p>
 
       <label class="field">
-        <span>用户名</span>
+        <span>Username</span>
         <input
           v-model="form.username"
           type="text"
@@ -54,7 +54,7 @@ async function submit() {
       </label>
 
       <label class="field">
-        <span>密码</span>
+        <span>Password</span>
         <input
           v-model="form.password"
           type="password"
@@ -67,7 +67,7 @@ async function submit() {
       </label>
 
       <button class="primary-button" :disabled="state.busy.auth">
-        {{ state.busy.auth ? "登录中..." : "登录" }}
+        {{ state.busy.auth ? "Signing in..." : "Sign in" }}
       </button>
     </form>
   </section>

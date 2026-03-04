@@ -3,6 +3,8 @@ import { computed } from "vue";
 import { RouterLink } from "vue-router";
 
 import { getCategoryOption } from "../categoryOptions";
+import { getMoodOption } from "../moodOptions";
+import { getSocialOption } from "../socialOptions";
 import {
   acceptCurrentSuggestion,
   canReroll,
@@ -17,6 +19,44 @@ const rerollButtonDisabled = computed(
 const acceptButtonDisabled = computed(
   () => actionsDisabled.value || Boolean(state.suggestion?.is_accepted)
 );
+
+function stripLeadingEmoji(label) {
+  return String(label || "")
+    .replace(/^[^\p{L}\p{N}]+/u, "")
+    .trim();
+}
+
+function getTimeDescriptor(minutes) {
+  if (!minutes) {
+    return "open-ended";
+  }
+
+  if (minutes <= 20) {
+    return "short";
+  }
+
+  if (minutes <= 60) {
+    return "manageable";
+  }
+
+  return "longer";
+}
+
+const whyThisActivity = computed(() => {
+  if (!state.suggestion) {
+    return "";
+  }
+
+  const mood = state.constraints.mood
+    ? stripLeadingEmoji(getMoodOption(state.constraints.mood).label).toLowerCase()
+    : "current";
+  const social = state.constraints.social_preference
+    ? stripLeadingEmoji(getSocialOption(state.constraints.social_preference).label).toLowerCase()
+    : "your preference";
+  const time = getTimeDescriptor(Number(state.constraints.time_minutes || 0));
+
+  return `Based on your ${mood} mood, ${time} available time, and ${social} preference.`;
+});
 
 async function handleAccept() {
   try {
@@ -52,13 +92,17 @@ function formatBudgetRange(activity) {
 
   return `£${minBudget} - £${maxBudget}`;
 }
+
+function formatSocialLabel(socialType) {
+  return stripLeadingEmoji(getSocialOption(socialType).label);
+}
 </script>
 
 <template>
   <section class="panel result-panel">
     <div class="panel-heading">
-      <h2>结果展示</h2>
-      <p>这里展示你刚生成的活动。确认接受，或直接重抽一个新结果。</p>
+      <h2>Your Suggestion</h2>
+      <p>Your generated activity will appear here. Accept it or try another one.</p>
     </div>
 
     <Transition name="result-swap" mode="out-in">
@@ -79,12 +123,16 @@ function formatBudgetRange(activity) {
               class="live-result-pill"
               :class="{ accepted: state.suggestion.is_accepted }"
             >
-              {{ state.suggestion.is_accepted ? "已接受" : "待确认" }}
+              {{ state.suggestion.is_accepted ? "Accepted" : "Review" }}
             </span>
           </div>
 
           <h3>{{ state.suggestion.activity.title }}</h3>
           <p class="result-copy">{{ state.suggestion.activity.description }}</p>
+          <div class="why-card">
+            <strong>Why this activity?</strong>
+            <p>{{ whyThisActivity }}</p>
+          </div>
           <p
             v-if="state.suggestion.fallback_applied && state.suggestion.fallback_message"
             class="inline-hint"
@@ -94,19 +142,19 @@ function formatBudgetRange(activity) {
 
           <dl class="metrics">
             <div>
-              <dt>预计时长</dt>
+              <dt>Estimated Time</dt>
               <dd>
                 {{ state.suggestion.activity.min_time_minutes }} -
-                {{ state.suggestion.activity.max_time_minutes }} 分钟
+                {{ state.suggestion.activity.max_time_minutes }} min
               </dd>
             </div>
             <div>
-              <dt>预计预算</dt>
+              <dt>Estimated Budget</dt>
               <dd>{{ formatBudgetRange(state.suggestion.activity) }}</dd>
             </div>
             <div>
-              <dt>社交类型</dt>
-              <dd>{{ state.suggestion.activity.social_type }}</dd>
+              <dt>Social</dt>
+              <dd>{{ formatSocialLabel(state.suggestion.activity.social_type) }}</dd>
             </div>
           </dl>
 
@@ -116,7 +164,7 @@ function formatBudgetRange(activity) {
               :disabled="rerollButtonDisabled"
               @click="handleReroll"
             >
-              {{ state.busy.generate ? "重抽中..." : "重抽" }}
+              {{ state.busy.generate ? "Generating..." : "Generate another activity" }}
             </button>
 
             <button
@@ -124,14 +172,14 @@ function formatBudgetRange(activity) {
               :disabled="acceptButtonDisabled"
               @click="handleAccept"
             >
-              {{ state.busy.accept ? "处理中..." : "接受" }}
+              {{ state.busy.accept ? "Working..." : "Accept" }}
             </button>
           </div>
 
           <div v-else class="accepted-guidance" role="status">
-            <strong>下一步</strong>
-            <p>活动已经确认。去历史记录页把它标记为“完成”或“跳过”。</p>
-            <RouterLink class="primary-link" to="/history">前往历史记录</RouterLink>
+            <strong>Next step</strong>
+            <p>Head to Activity History and mark this as done or skipped.</p>
+            <RouterLink class="primary-link" to="/history">Open history</RouterLink>
           </div>
         </div>
       </div>
@@ -159,12 +207,12 @@ function formatBudgetRange(activity) {
       </div>
 
       <div v-else-if="state.pendingLog" key="result-pending" class="empty-state">
-        <p>你已经有一个已接受的活动待记录。先去历史记录页标记完成或跳过。</p>
-        <RouterLink class="primary-link" to="/history">前往历史记录</RouterLink>
+        <p>You already have an accepted activity waiting to be logged.</p>
+        <RouterLink class="primary-link" to="/history">Open history</RouterLink>
       </div>
 
       <div v-else key="result-empty" class="empty-state">
-        <p>还没有生成结果。先填写左侧约束，再点击“✨ Surprise me”。</p>
+        <p>No suggestion yet. Fill in your limits and hit ✨ Generate Activity.</p>
       </div>
     </Transition>
   </section>

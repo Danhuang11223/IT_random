@@ -17,9 +17,9 @@ const actionButtonsDisabled = computed(
   () => state.busy.history || state.busy.log || state.busy.deleteLog
 );
 const filters = [
-  { label: "全部", value: "ALL" },
-  { label: "只看完成", value: "COMPLETED" },
-  { label: "只看跳过", value: "SKIPPED" },
+  { label: "All", value: "ALL" },
+  { label: "Completed", value: "COMPLETED" },
+  { label: "Skipped", value: "SKIPPED" },
 ];
 
 async function handlePageChange(page) {
@@ -70,17 +70,17 @@ async function handleDelete(log) {
 <template>
   <section class="panel history-panel wide-panel">
     <div class="panel-heading">
-      <h2>活动历史</h2>
-      <p>这里记录你已经接受的活动，以及所有完成或跳过的结果。</p>
+      <h2>Activity History</h2>
+      <p>What you've tried so far. Kept it — or skipped it.</p>
     </div>
 
     <div v-if="pendingSuggestion" class="pending-log-card">
       <div class="history-head">
         <strong>{{ pendingSuggestion.activity.title }}</strong>
-        <span class="status-pill pending">待记录</span>
+        <span class="status-pill pending">Pending</span>
       </div>
       <p class="history-meta">
-        {{ getCategoryOption(pendingSuggestion.activity.category).label }} · 已接受，等待标记结果
+        {{ getCategoryOption(pendingSuggestion.activity.category).label }} · Accepted · waiting to be logged
       </p>
       <p class="pending-card-copy">
         {{ pendingSuggestion.activity.description }}
@@ -92,7 +92,7 @@ async function handleDelete(log) {
         </p>
 
         <label class="field">
-          <span>评分（可选，仅完成时写入）</span>
+          <span>Rating (optional, saved only when marked done)</span>
           <input
             v-model="state.completionForm.rating"
             type="number"
@@ -106,7 +106,7 @@ async function handleDelete(log) {
         </label>
 
         <label class="field">
-          <span>备注（可选）</span>
+          <span>Notes (optional)</span>
           <textarea
             v-model="state.completionForm.comment"
             rows="3"
@@ -123,7 +123,7 @@ async function handleDelete(log) {
             :disabled="actionButtonsDisabled"
             @click="handleComplete"
           >
-            {{ state.busy.log ? "提交中..." : "标记完成" }}
+            {{ state.busy.log ? "Saving..." : "Mark as done" }}
           </button>
 
           <button
@@ -131,7 +131,7 @@ async function handleDelete(log) {
             :disabled="actionButtonsDisabled"
             @click="handleSkip"
           >
-            标记跳过
+            Mark as skipped
           </button>
 
           <button
@@ -139,7 +139,7 @@ async function handleDelete(log) {
             :disabled="actionButtonsDisabled"
             @click="handleDelete(pendingSuggestion)"
           >
-            {{ state.busy.deleteLog ? "删除中..." : "删除待记录" }}
+            {{ state.busy.deleteLog ? "Deleting..." : "Delete pending" }}
           </button>
         </div>
       </div>
@@ -165,7 +165,7 @@ async function handleDelete(log) {
       v-if="state.busy.dashboard && !state.historyItems.length && !pendingSuggestion"
       class="empty-state"
     >
-      <p>加载历史记录中...</p>
+      <p>Loading history...</p>
     </div>
 
     <ul v-else-if="state.historyItems.length" class="history-list">
@@ -174,19 +174,19 @@ async function handleDelete(log) {
           <strong>{{ item.activity.title }}</strong>
           <div class="history-actions">
             <span class="status-pill" :class="item.status.toLowerCase()">
-              {{ item.status === "COMPLETED" ? "已完成" : "已跳过" }}
+              {{ item.status === "COMPLETED" ? "Done" : "Skipped" }}
             </span>
             <button
               class="ghost-button small-button"
               :disabled="state.busy.deleteLog"
               @click="handleDelete(item)"
             >
-              {{ state.busy.deleteLog ? "删除中..." : "删除" }}
+              {{ state.busy.deleteLog ? "Deleting..." : "Delete" }}
             </button>
           </div>
         </div>
         <p class="history-meta">
-          {{ getCategoryOption(item.activity.category).label }} · 评分 {{ item.rating ?? "-" }}
+          {{ getCategoryOption(item.activity.category).label }} · Rating {{ item.rating ?? "-" }}
         </p>
         <p v-if="item.comment" class="history-comment">{{ item.comment }}</p>
       </li>
@@ -198,13 +198,13 @@ async function handleDelete(log) {
         :disabled="state.busy.history || state.pagination.page <= 1"
         @click="handlePageChange(state.pagination.page - 1)"
       >
-        上一页
+        Previous
       </button>
 
       <div class="page-indicator">
-        <strong>第 {{ state.pagination.page }} / {{ state.pagination.total_pages }} 页</strong>
-        <span v-if="state.busy.history" class="subtle-hint">切换分页中...</span>
-        <span v-else-if="hasPagination">共 {{ state.pagination.count }} 条记录</span>
+        <strong>Page {{ state.pagination.page }} / {{ state.pagination.total_pages }}</strong>
+        <span v-if="state.busy.history" class="subtle-hint">Switching pages...</span>
+        <span v-else-if="hasPagination">{{ state.pagination.count }} total records</span>
       </div>
 
       <div v-if="hasPagination" class="page-number-group">
@@ -231,7 +231,7 @@ async function handleDelete(log) {
         "
         @click="handlePageChange(state.pagination.page + 1)"
       >
-        下一页
+        Next
       </button>
     </div>
 
@@ -239,8 +239,8 @@ async function handleDelete(log) {
       <p>
         {{
           pendingSuggestion
-            ? "还没有已归档的历史记录。先把上面的活动标记为完成或跳过。"
-            : "还没有历史记录。先回到仪表盘生成并接受一个活动。"
+            ? "Nothing here yet. Finish the current item first."
+            : "Nothing here yet. Start with ✨ Generate Activity."
         }}
       </p>
     </div>

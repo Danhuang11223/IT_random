@@ -7,14 +7,9 @@ import RegisterPanel from "../components/RegisterPanel.vue";
 <template>
   <main class="single-column">
     <RegisterPanel />
-
-    <section class="panel helper-panel">
-      <div class="panel-heading">
-        <h2>已经有账号？</h2>
-        <p>直接登录即可进入控制台。</p>
-      </div>
-
-      <RouterLink class="primary-link" to="/login">返回登录</RouterLink>
-    </section>
+    <p class="auth-inline-row">
+      Already have an account?
+      <RouterLink class="auth-inline-link" to="/login">Sign in</RouterLink>
+    </p>
   </main>
 </template>

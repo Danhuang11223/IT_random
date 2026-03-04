@@ -2,9 +2,10 @@ import axios from "axios";
 
 const TOKEN_KEY = "daily-random-events-token";
 const USER_KEY = "daily-random-events-user";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export const api = axios.create({
-  baseURL: "/api",
+  baseURL: API_BASE_URL,
 });
 
 export function getStoredToken() {

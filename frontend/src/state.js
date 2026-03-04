@@ -212,7 +212,7 @@ function buildErrorMessage(responseData, fieldErrors) {
     return fieldMessage[1];
   }
 
-  return "请求失败，请检查后端服务是否已启动。";
+  return "Request failed. Make sure the back end is running.";
 }
 
 function setInlineValidationErrors(scope, errors) {
@@ -229,11 +229,11 @@ function validateLoginCredentials(credentials) {
   const errors = {};
 
   if (!String(credentials.username || "").trim()) {
-    errors.username = "请输入用户名。";
+    errors.username = "Enter a username.";
   }
 
   if (!String(credentials.password || "").trim()) {
-    errors.password = "请输入密码。";
+    errors.password = "Enter a password.";
   }
 
   return errors;
@@ -246,21 +246,21 @@ function validateRegisterPayload(payload) {
   const password = String(payload.password || "");
 
   if (!username) {
-    errors.username = "请输入用户名。";
+    errors.username = "Enter a username.";
   } else if (username.length < 3) {
-    errors.username = "用户名至少需要 3 个字符。";
+    errors.username = "Username must be at least 3 characters.";
   }
 
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    errors.email = "请输入有效的邮箱地址。";
+    errors.email = "Enter a valid email address.";
   }
 
   if (!password.trim()) {
-    errors.password = "请输入密码。";
+    errors.password = "Enter a password.";
   } else if (password.length < 8) {
-    errors.password = "密码至少需要 8 个字符。";
+    errors.password = "Password must be at least 8 characters.";
   } else if (password.length > 128) {
-    errors.password = "密码长度不能超过 128 个字符。";
+    errors.password = "Password must be 128 characters or fewer.";
   }
 
   return errors;
@@ -274,33 +274,33 @@ function validateConstraints() {
   const budgetValue = Number(rawBudgetValue);
 
   if (!rawTimeValue) {
-    errors.time_minutes = "请输入可用时间。";
+    errors.time_minutes = "Enter your available time.";
   } else if (!Number.isInteger(timeValue)) {
-    errors.time_minutes = "请输入整数分钟数。";
+    errors.time_minutes = "Time must be a whole number of minutes.";
   } else if (timeValue < 5 || timeValue > 1440) {
-    errors.time_minutes = "时间范围需要在 5 到 1440 分钟之间。";
+    errors.time_minutes = "Time must be between 5 and 1440 minutes.";
   } else if (timeValue % 5 !== 0) {
-    errors.time_minutes = "时间请按 5 分钟为单位填写。";
+    errors.time_minutes = "Use 5-minute increments.";
   }
 
   if (!rawBudgetValue) {
-    errors.budget = "请输入预算。";
+    errors.budget = "Enter your budget.";
   } else if (Number.isNaN(budgetValue)) {
-    errors.budget = "请输入有效预算。";
+    errors.budget = "Enter a valid budget.";
   } else if (!Number.isInteger(budgetValue)) {
-    errors.budget = "预算请填写整数。";
+    errors.budget = "Budget must be a whole number.";
   } else if (budgetValue < 0) {
-    errors.budget = "预算不能小于 0。";
+    errors.budget = "Budget cannot be below 0.";
   } else if (budgetValue > 999999) {
-    errors.budget = "预算超出允许范围。";
+    errors.budget = "Budget is out of range.";
   }
 
   if (!String(state.constraints.mood || "").trim()) {
-    errors.mood = "请选择当前心情。";
+    errors.mood = "Choose how you feel today.";
   }
 
   if (!String(state.constraints.social_preference || "").trim()) {
-    errors.social_preference = "请选择社交偏好。";
+    errors.social_preference = "Choose who is joining.";
   }
 
   return errors;
@@ -315,14 +315,14 @@ function validateCompletion(status) {
     const ratingValue = Number(rawRating);
 
     if (!Number.isInteger(ratingValue)) {
-      errors.rating = "评分必须是整数。";
+      errors.rating = "Rating must be a whole number.";
     } else if (ratingValue < 1 || ratingValue > 5) {
-      errors.rating = "评分范围需要在 1 到 5 之间。";
+      errors.rating = "Rating must be between 1 and 5.";
     }
   }
 
   if (commentValue.length > 500) {
-    errors.comment = "备注最多 500 个字符。";
+    errors.comment = "Comment must be 500 characters or fewer.";
   }
 
   return errors;
@@ -361,11 +361,11 @@ export function setNotice(text) {
 
 function setRetry(retryAction, retryLabel) {
   state.retryAction = retryAction || null;
-  state.retryLabel = retryAction ? retryLabel || "重试" : "";
+  state.retryLabel = retryAction ? retryLabel || "Retry" : "";
 }
 
 function setRequestError(err, options = {}) {
-  const { fieldScope = null, retryAction = null, retryLabel = "重试" } = options;
+  const { fieldScope = null, retryAction = null, retryLabel = "Retry" } = options;
   const responseData = err?.response?.data;
   const fieldErrors = extractFieldErrors(responseData);
 
@@ -445,7 +445,7 @@ export async function loginWithPassword(credentials) {
     }
 
     if (dashboardLoaded) {
-      setNotice(`已登录：${result.user.username}`);
+      setNotice(`Signed in as ${result.user.username}.`);
     }
 
     return {
@@ -460,7 +460,7 @@ export async function loginWithPassword(credentials) {
     setRequestError(err, {
       fieldScope: "login",
       retryAction: () => loginWithPassword({ ...credentials }),
-      retryLabel: "重试登录",
+      retryLabel: "Retry sign in",
     });
     throw err;
   } finally {
@@ -492,7 +492,7 @@ export async function registerAccount(payload) {
     }
 
     if (dashboardLoaded) {
-      setNotice(`注册成功：${result.user.username}`);
+      setNotice(`Account created: ${result.user.username}.`);
     }
 
     return {
@@ -507,7 +507,7 @@ export async function registerAccount(payload) {
     setRequestError(err, {
       fieldScope: "register",
       retryAction: () => registerAccount({ ...payload }),
-      retryLabel: "重试注册",
+      retryLabel: "Retry create account",
     });
     throw err;
   } finally {
@@ -520,7 +520,7 @@ export function logout() {
   state.sessionToken = "";
   state.user = null;
   resetSessionData();
-  setNotice("已退出登录。");
+  setNotice("Signed out.");
 }
 
 export async function loadDashboardData(options = {}) {
@@ -552,7 +552,7 @@ export async function loadDashboardData(options = {}) {
     state.dashboardReady = false;
     setRequestError(err, {
       retryAction: () => loadDashboardData({ force: true }),
-      retryLabel: "重试加载控制台",
+      retryLabel: "Retry loading dashboard",
     });
     throw err;
   } finally {
@@ -576,7 +576,7 @@ export async function loadHistoryPage(page = 1) {
   } catch (err) {
     setRequestError(err, {
       retryAction: () => loadHistoryPage(targetPage),
-      retryLabel: "重试加载历史记录",
+      retryLabel: "Retry loading history",
     });
     throw err;
   } finally {
@@ -634,7 +634,7 @@ export async function generateSuggestion() {
     state.suggestion = result;
     resetFeedback();
     clearFormErrors("completion");
-    setNotice("已生成一个随机事件。");
+    setNotice("Generated a new suggestion.");
     return result;
   } catch (err) {
     if (err?.isValidation) {
@@ -644,7 +644,7 @@ export async function generateSuggestion() {
     setRequestError(err, {
       fieldScope: "constraints",
       retryAction: () => generateSuggestion(),
-      retryLabel: "重试生成",
+      retryLabel: "Retry generating",
     });
     throw err;
   } finally {
@@ -663,12 +663,12 @@ export async function rerollSuggestion() {
     state.suggestion = result;
     resetFeedback();
     clearFormErrors("completion");
-    setNotice("已为当前请求重抽一个结果。");
+    setNotice("Generated another option.");
     return result;
   } catch (err) {
     setRequestError(err, {
       retryAction: () => rerollSuggestion(),
-      retryLabel: "重试重抽",
+      retryLabel: "Retry reroll",
     });
     throw err;
   } finally {
@@ -690,12 +690,12 @@ export async function acceptCurrentSuggestion() {
     } catch {
       // History refresh failure is already handled by loadHistoryPage retry state.
     }
-    setNotice("已接受当前建议。请前往历史记录标记完成或跳过。");
+    setNotice("Suggestion accepted. Head to Activity History to mark it as done or skipped.");
     return result;
   } catch (err) {
     setRequestError(err, {
       retryAction: () => acceptCurrentSuggestion(),
-      retryLabel: "重试接受",
+      retryLabel: "Retry accept",
     });
     throw err;
   } finally {
@@ -741,7 +741,7 @@ export async function createActivityLog(status) {
     }
 
     if (!state.error) {
-      setNotice(status === "COMPLETED" ? "已记录完成。" : "已记录跳过。");
+      setNotice(status === "COMPLETED" ? "Marked as done." : "Marked as skipped.");
     }
   } catch (err) {
     if (err?.isValidation) {
@@ -751,7 +751,7 @@ export async function createActivityLog(status) {
     setRequestError(err, {
       fieldScope: "completion",
       retryAction: () => createActivityLog(status),
-      retryLabel: "重试提交记录",
+      retryLabel: "Retry saving log",
     });
     throw err;
   } finally {
@@ -791,12 +791,12 @@ export async function deleteHistoryLog(log) {
     }
 
     if (!state.error) {
-      setNotice("已删除历史记录。");
+      setNotice("History item deleted.");
     }
   } catch (err) {
     setRequestError(err, {
       retryAction: () => deleteHistoryLog(log),
-      retryLabel: "重试删除记录",
+      retryLabel: "Retry deleting log",
     });
     throw err;
   } finally {

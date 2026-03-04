@@ -15,7 +15,7 @@ import { retryLastRequest, state } from "./state";
           :disabled="state.busy.retry"
           @click="retryLastRequest"
         >
-          {{ state.busy.retry ? "重试中..." : state.retryLabel || "重试" }}
+          {{ state.busy.retry ? "Retrying..." : state.retryLabel || "Retry" }}
         </button>
       </div>
     </div>

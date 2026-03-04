@@ -1,34 +1,34 @@
 const CATEGORY_OPTIONS = {
   CLASS: {
-    label: "课程体验",
+    label: "Class",
     order: 80,
   },
   CULTURE: {
-    label: "文化展览",
+    label: "Culture",
     order: 60,
   },
   FITNESS: {
-    label: "运动健身",
+    label: "Fitness",
     order: 50,
   },
   FOOD: {
-    label: "餐饮咖啡",
+    label: "Food",
     order: 40,
   },
   HOME: {
-    label: "居家",
+    label: "Home",
     order: 30,
   },
   INDOOR: {
-    label: "室内活动",
+    label: "Indoor",
     order: 10,
   },
   OUTDOOR: {
-    label: "户外活动",
+    label: "Outdoor",
     order: 20,
   },
   SOCIAL: {
-    label: "社交活动",
+    label: "Social",
     order: 70,
   },
 };
@@ -92,6 +92,6 @@ export function sortCategoryValues(categories = []) {
       return leftOption.order - rightOption.order;
     }
 
-    return leftOption.label.localeCompare(rightOption.label, "zh-Hans-CN");
+    return leftOption.label.localeCompare(rightOption.label, "en");
   });
 }

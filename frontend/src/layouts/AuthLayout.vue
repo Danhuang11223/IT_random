@@ -6,21 +6,21 @@ import { RouterLink, RouterView } from "vue-router";
   <section class="auth-layout">
     <aside class="auth-showcase">
       <p class="eyebrow">Daily Random Events</p>
-      <h1>让今天有一个明确的开始</h1>
+      <h1>Not sure what to do today?</h1>
       <p class="showcase-copy">
-        输入时间、预算和心情，系统帮你从可执行的活动池里抽出一个结果。
-        不再卡在“待会儿再决定”。
+        Generate a random activity based on your mood, time, and preferences.
       </p>
+      <p class="showcase-note">No more "maybe later."</p>
 
       <div class="showcase-points">
-        <div class="showcase-chip">约束筛选</div>
-        <div class="showcase-chip">随机生成</div>
-        <div class="showcase-chip">完成记录</div>
+        <div class="showcase-chip">Set limits</div>
+        <div class="showcase-chip">Generate</div>
+        <div class="showcase-chip">Track progress</div>
       </div>
 
       <nav class="auth-nav">
-        <RouterLink to="/login">登录</RouterLink>
-        <RouterLink to="/register">注册</RouterLink>
+        <RouterLink class="auth-cta-primary" to="/login">Sign in</RouterLink>
+        <RouterLink class="auth-cta-secondary" to="/register">Create account</RouterLink>
       </nav>
     </aside>
 
