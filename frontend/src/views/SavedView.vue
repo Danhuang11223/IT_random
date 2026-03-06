@@ -2,21 +2,14 @@
 import { onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import HistoryList from "../components/HistoryList.vue";
-import { loadDashboardData, loadHistoryPage, state } from "../state";
+import SavedList from "../components/SavedList.vue";
+import { loadDashboardData, loadSavedPage, state } from "../state";
 
 const route = useRoute();
 const router = useRouter();
-const VALID_HISTORY_FILTERS = new Set(["ALL", "COMPLETED", "SKIPPED"]);
 const VALID_SORTS = new Set(["newest", "oldest", "title"]);
 
-function normalizeHistoryQuery(query) {
-  const rawStatus = Array.isArray(query.status) ? query.status[0] : query.status;
-  const normalizedStatus = String(rawStatus || "ALL").toUpperCase();
-  const status = VALID_HISTORY_FILTERS.has(normalizedStatus)
-    ? normalizedStatus
-    : "ALL";
-
+function normalizeSavedQuery(query) {
   const rawPage = Array.isArray(query.page) ? query.page[0] : query.page;
   const parsedPage = Number.parseInt(String(rawPage || "1"), 10);
   const page = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
@@ -28,15 +21,11 @@ function normalizeHistoryQuery(query) {
   const normalizedSort = String(rawSort || "newest").toLowerCase();
   const sort = VALID_SORTS.has(normalizedSort) ? normalizedSort : "newest";
 
-  return { page, status, q, sort };
+  return { page, q, sort };
 }
 
-function buildHistoryQuery(status, page, q, sort) {
+function buildSavedQuery(page, q, sort) {
   const query = {};
-
-  if (status && status !== "ALL") {
-    query.status = status;
-  }
 
   if (page > 1) {
     query.page = String(page);
@@ -55,10 +44,6 @@ function buildHistoryQuery(status, page, q, sort) {
 
 function getTrackedRouteQuery() {
   const query = {};
-
-  if (typeof route.query.status === "string") {
-    query.status = route.query.status;
-  }
 
   if (typeof route.query.page === "string") {
     query.page = route.query.page;
@@ -87,44 +72,41 @@ function isSameQuery(left, right) {
 }
 
 async function syncRouteFromState() {
-  const desiredQuery = buildHistoryQuery(
-    state.historyFilter,
-    state.pagination.page || 1,
-    state.historyQuery,
-    state.historySort
+  const desiredQuery = buildSavedQuery(
+    state.savedPagination.page || 1,
+    state.savedQuery,
+    state.savedSort
   );
 
   if (isSameQuery(getTrackedRouteQuery(), desiredQuery)) {
     return;
   }
 
-  await router.replace({ name: "history", query: desiredQuery });
+  await router.replace({ name: "saved", query: desiredQuery });
 }
 
-async function applyHistoryQuery(force = false) {
-  const { page, status, q, sort } = normalizeHistoryQuery(route.query);
+async function applySavedQuery(force = false) {
+  const { page, q, sort } = normalizeSavedQuery(route.query);
   const shouldReload =
     force ||
     !state.dashboardReady ||
-    state.historyFilter !== status ||
-    state.pagination.page !== page ||
-    state.historyQuery !== q ||
-    state.historySort !== sort;
+    state.savedPagination.page !== page ||
+    state.savedQuery !== q ||
+    state.savedSort !== sort;
 
   if (!shouldReload) {
     await syncRouteFromState();
     return;
   }
 
-  state.historyFilter = status;
-  state.historyQuery = q;
-  state.historySort = sort;
+  state.savedQuery = q;
+  state.savedSort = sort;
 
   try {
     if (!state.dashboardReady || force) {
-      await loadDashboardData({ force: true, page });
+      await loadDashboardData({ force: true, savedPage: page });
     } else {
-      await loadHistoryPage(page, { query: q, sort });
+      await loadSavedPage(page, { query: q, sort });
     }
   } catch {
     return;
@@ -135,38 +117,37 @@ async function applyHistoryQuery(force = false) {
 
 onMounted(async () => {
   try {
-    await applyHistoryQuery(!state.dashboardReady);
+    await applySavedQuery(!state.dashboardReady);
   } catch {
-    // Error banner is handled in global state.
+    // Error banner is handled in shared state.
   }
 });
 
 watch(
-  () => [route.query.page, route.query.status, route.query.q, route.query.sort],
+  () => [route.query.page, route.query.q, route.query.sort],
   async () => {
-    if (state.busy.dashboard || state.busy.history) {
+    if (state.busy.dashboard || state.busy.saved) {
       return;
     }
 
     try {
-      await applyHistoryQuery();
+      await applySavedQuery();
     } catch {
-      // Error banner is handled in global state.
+      // Error banner is handled in shared state.
     }
   }
 );
 
 watch(
   () => [
-    state.historyFilter,
-    state.historyQuery,
-    state.historySort,
-    state.pagination.page,
+    state.savedQuery,
+    state.savedSort,
+    state.savedPagination.page,
     state.busy.dashboard,
-    state.busy.history,
+    state.busy.saved,
   ],
-  async ([, , , , busyDashboard, busyHistory]) => {
-    if (busyDashboard || busyHistory) {
+  async ([, , , busyDashboard, busySaved]) => {
+    if (busyDashboard || busySaved) {
       return;
     }
 
@@ -181,6 +162,6 @@ watch(
 
 <template>
   <main class="single-column history-flow">
-    <HistoryList />
+    <SavedList />
   </main>
 </template>

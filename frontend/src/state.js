@@ -3,21 +3,36 @@ import { computed, reactive } from "vue";
 import {
   acceptSuggestion,
   clearSession,
+  createAdminActivity,
   createLog,
+  createSaved,
+  deleteAdminActivity,
   deleteLog as destroyLog,
+  deleteSaved as destroySaved,
+  fetchAdminActivities,
+  fetchAdminAuditLogs,
   fetchLogs,
   fetchMetadata,
+  fetchSaved,
   generateActivity,
   getStoredToken,
   getStoredUser,
+  importAdminActivitiesCsv,
   login,
   register,
   rerollActivity,
+  updateAdminActivity,
 } from "./api";
+import { getBudgetCap } from "./budgetOptions";
+
+const UI_PREFS_KEY = "daily-random-events-ui-prefs";
+const HISTORY_SORTS = new Set(["newest", "oldest", "title"]);
+let undoAction = null;
+let undoTimerId = null;
 
 const initialConstraints = () => ({
   time_minutes: "",
-  budget: "",
+  budget_preference: "",
   mood: "",
   social_preference: "",
   excluded_categories: [],
@@ -33,7 +48,74 @@ const initialFormErrors = () => ({
   register: {},
   constraints: {},
   completion: {},
+  saved: {},
+  admin: {},
 });
+
+const initialPagination = (pageSize = 10) => ({
+  count: 0,
+  page: 1,
+  page_size: pageSize,
+  total_pages: 1,
+  next: null,
+  previous: null,
+});
+
+function loadStoredUiPrefs() {
+  if (typeof window === "undefined") {
+    return {
+      reduceMotion: false,
+      largerText: false,
+      highContrast: false,
+    };
+  }
+
+  const raw = window.localStorage.getItem(UI_PREFS_KEY);
+  if (!raw) {
+    return {
+      reduceMotion: false,
+      largerText: false,
+      highContrast: false,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      reduceMotion: Boolean(parsed?.reduceMotion),
+      largerText: Boolean(parsed?.largerText),
+      highContrast: Boolean(parsed?.highContrast),
+    };
+  } catch {
+    return {
+      reduceMotion: false,
+      largerText: false,
+      highContrast: false,
+    };
+  }
+}
+
+function persistUiPrefs(uiPrefs) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(UI_PREFS_KEY, JSON.stringify(uiPrefs));
+}
+
+function applyUiPrefsClasses(uiPrefs) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const body = document.body;
+  body.classList.toggle("pref-reduce-motion", Boolean(uiPrefs.reduceMotion));
+  body.classList.toggle("pref-large-text", Boolean(uiPrefs.largerText));
+  body.classList.toggle("pref-high-contrast", Boolean(uiPrefs.highContrast));
+}
+
+const initialUiPrefs = loadStoredUiPrefs();
+applyUiPrefsClasses(initialUiPrefs);
 
 export const state = reactive({
   sessionToken: getStoredToken(),
@@ -50,14 +132,16 @@ export const state = reactive({
   pendingLog: null,
   historyItems: [],
   historyFilter: "ALL",
-  pagination: {
-    count: 0,
-    page: 1,
-    page_size: 10,
-    total_pages: 1,
-    next: null,
-    previous: null,
-  },
+  historyQuery: "",
+  historySort: "newest",
+  pagination: initialPagination(10),
+  savedItems: [],
+  savedQuery: "",
+  savedSort: "newest",
+  savedPagination: initialPagination(10),
+  adminAuditLogs: [],
+  adminAuditPagination: initialPagination(20),
+  uiPrefs: initialUiPrefs,
   message: "",
   error: "",
   retryAction: null,
@@ -71,20 +155,27 @@ export const state = reactive({
     log: false,
     deleteLog: false,
     history: false,
+    saved: false,
+    admin: false,
     retry: false,
+  },
+  undo: {
+    visible: false,
+    label: "",
   },
 });
 
 export const isLoggedIn = computed(() => Boolean(state.sessionToken));
 export const canReroll = computed(() => Boolean(state.suggestion?.request_id));
 export const hasPendingAcceptedSuggestion = computed(() =>
-  Boolean(state.pendingLog || state.suggestion?.is_accepted)
+  Boolean(state.pendingLog)
 );
-export const historyPageNumbers = computed(() => {
-  const totalPages = Math.max(1, Number(state.pagination.total_pages || 1));
+
+function buildPageItems(pagination, keyPrefix) {
+  const totalPages = Math.max(1, Number(pagination.total_pages || 1));
   const currentPage = Math.min(
     totalPages,
-    Math.max(1, Number(state.pagination.page || 1))
+    Math.max(1, Number(pagination.page || 1))
   );
   const items = [];
 
@@ -92,7 +183,7 @@ export const historyPageNumbers = computed(() => {
     items.push({
       type: "page",
       value: page,
-      key: `page-${page}`,
+      key: `${keyPrefix}-page-${page}`,
     });
   };
 
@@ -100,7 +191,7 @@ export const historyPageNumbers = computed(() => {
     items.push({
       type: "ellipsis",
       value: "...",
-      key: `ellipsis-${position}`,
+      key: `${keyPrefix}-ellipsis-${position}`,
     });
   };
 
@@ -108,7 +199,6 @@ export const historyPageNumbers = computed(() => {
     for (let page = 1; page <= totalPages; page += 1) {
       pushPage(page);
     }
-
     return items;
   }
 
@@ -137,9 +227,15 @@ export const historyPageNumbers = computed(() => {
   }
   pushEllipsis("right");
   pushPage(totalPages);
-
   return items;
-});
+}
+
+export const historyPageNumbers = computed(() =>
+  buildPageItems(state.pagination, "history")
+);
+export const savedPageNumbers = computed(() =>
+  buildPageItems(state.savedPagination, "saved")
+);
 
 function resetFeedback() {
   state.completionForm = initialCompletion();
@@ -154,6 +250,32 @@ function createValidationError() {
 function clearRetry() {
   state.retryAction = null;
   state.retryLabel = "";
+}
+
+function clearUndo() {
+  if (undoTimerId && typeof window !== "undefined") {
+    window.clearTimeout(undoTimerId);
+    undoTimerId = null;
+  }
+  undoAction = null;
+  state.undo = {
+    visible: false,
+    label: "",
+  };
+}
+
+function setUndo(label, action) {
+  clearUndo();
+  undoAction = action;
+  state.undo = {
+    visible: true,
+    label,
+  };
+  if (typeof window !== "undefined") {
+    undoTimerId = window.setTimeout(() => {
+      clearUndo();
+    }, 5000);
+  }
 }
 
 function clearFormErrors(scope = null) {
@@ -269,9 +391,7 @@ function validateRegisterPayload(payload) {
 function validateConstraints() {
   const errors = {};
   const rawTimeValue = String(state.constraints.time_minutes ?? "").trim();
-  const rawBudgetValue = String(state.constraints.budget ?? "").trim();
   const timeValue = Number(rawTimeValue);
-  const budgetValue = Number(rawBudgetValue);
 
   if (!rawTimeValue) {
     errors.time_minutes = "Enter your available time.";
@@ -283,16 +403,8 @@ function validateConstraints() {
     errors.time_minutes = "Use 5-minute increments.";
   }
 
-  if (!rawBudgetValue) {
-    errors.budget = "Enter your budget.";
-  } else if (Number.isNaN(budgetValue)) {
-    errors.budget = "Enter a valid budget.";
-  } else if (!Number.isInteger(budgetValue)) {
-    errors.budget = "Budget must be a whole number.";
-  } else if (budgetValue < 0) {
-    errors.budget = "Budget cannot be below 0.";
-  } else if (budgetValue > 999999) {
-    errors.budget = "Budget is out of range.";
+  if (!String(state.constraints.budget_preference || "").trim()) {
+    errors.budget_preference = "Choose a budget level.";
   }
 
   if (!String(state.constraints.mood || "").trim()) {
@@ -340,23 +452,29 @@ function resetSessionData() {
   state.pendingLog = null;
   state.historyItems = [];
   state.historyFilter = "ALL";
-  state.pagination = {
-    count: 0,
-    page: 1,
-    page_size: 10,
-    total_pages: 1,
-    next: null,
-    previous: null,
-  };
+  state.historyQuery = "";
+  state.historySort = "newest";
+  state.pagination = initialPagination(10);
+  state.savedItems = [];
+  state.savedQuery = "";
+  state.savedSort = "newest";
+  state.savedPagination = initialPagination(10);
+  state.adminAuditLogs = [];
+  state.adminAuditPagination = initialPagination(20);
   clearFormErrors();
   clearRetry();
+  clearUndo();
   resetFeedback();
 }
 
-export function setNotice(text) {
+export function setNotice(text, options = {}) {
+  const preserveUndo = Boolean(options.preserveUndo);
   state.message = text;
   state.error = "";
   clearRetry();
+  if (!preserveUndo) {
+    clearUndo();
+  }
 }
 
 function setRetry(retryAction, retryLabel) {
@@ -379,6 +497,7 @@ function setRequestError(err, options = {}) {
   state.error = buildErrorMessage(responseData, fieldErrors);
   state.message = "";
   setRetry(retryAction, retryLabel);
+  clearUndo();
 }
 
 export function setError(err) {
@@ -412,6 +531,44 @@ function updateHistory(logs) {
   state.pendingLog = logs.pending || null;
   state.historyItems = logs.results || [];
   state.pagination = {
+    count: logs.count || 0,
+    page,
+    page_size: pageSize,
+    total_pages: totalPages,
+    next: logs.next || null,
+    previous: logs.previous || null,
+  };
+}
+
+function updateSaved(saved) {
+  const pageSize = state.savedPagination.page_size || 10;
+  const totalPages = Math.max(1, Math.ceil((saved.count || 0) / pageSize));
+  const page = Math.min(
+    totalPages,
+    Math.max(1, Number(saved.page || state.savedPagination.page || 1))
+  );
+
+  state.savedItems = saved.results || [];
+  state.savedPagination = {
+    count: saved.count || 0,
+    page,
+    page_size: pageSize,
+    total_pages: totalPages,
+    next: saved.next || null,
+    previous: saved.previous || null,
+  };
+}
+
+function updateAdminAudit(logs) {
+  const pageSize = state.adminAuditPagination.page_size || 20;
+  const totalPages = Math.max(1, Math.ceil((logs.count || 0) / pageSize));
+  const page = Math.min(
+    totalPages,
+    Math.max(1, Number(logs.page || state.adminAuditPagination.page || 1))
+  );
+
+  state.adminAuditLogs = logs.results || [];
+  state.adminAuditPagination = {
     count: logs.count || 0,
     page,
     page_size: pageSize,
@@ -530,11 +687,19 @@ export async function loadDashboardData(options = {}) {
 
   state.busy.dashboard = true;
   try {
-    const targetPage = Math.max(1, Number(options.page || 1));
-    const [meta, logs] = await Promise.all([
+    const targetHistoryPage = Math.max(1, Number(options.historyPage || options.page || 1));
+    const targetSavedPage = Math.max(1, Number(options.savedPage || 1));
+    const [meta, logs, saved] = await Promise.all([
       fetchMetadata(),
-      fetchLogs(targetPage, state.historyFilter),
+      fetchLogs(
+        targetHistoryPage,
+        state.historyFilter,
+        state.historyQuery,
+        state.historySort
+      ),
+      fetchSaved(targetSavedPage, state.savedQuery, state.savedSort),
     ]);
+
     state.metadata = {
       categories: meta.categories || [],
       moods: meta.moods || [],
@@ -543,8 +708,13 @@ export async function loadDashboardData(options = {}) {
     syncDefaults();
     updateHistory({
       ...logs,
-      page: targetPage,
+      page: targetHistoryPage,
     });
+    updateSaved({
+      ...saved,
+      page: targetSavedPage,
+    });
+
     state.dashboardReady = true;
     state.error = "";
     clearRetry();
@@ -560,12 +730,27 @@ export async function loadDashboardData(options = {}) {
   }
 }
 
-export async function loadHistoryPage(page = 1) {
+export async function loadHistoryPage(page = 1, options = {}) {
   const targetPage = Math.max(1, Number(page || 1));
+  const query =
+    options.query !== undefined ? String(options.query).trim() : state.historyQuery;
+  const sort = options.sort || state.historySort || "newest";
+
+  if (options.query !== undefined) {
+    state.historyQuery = query;
+  }
+  if (options.sort) {
+    state.historySort = HISTORY_SORTS.has(options.sort) ? options.sort : "newest";
+  }
 
   state.busy.history = true;
   try {
-    const logs = await fetchLogs(targetPage, state.historyFilter);
+    const logs = await fetchLogs(
+      targetPage,
+      state.historyFilter,
+      query,
+      state.historySort
+    );
     updateHistory({
       ...logs,
       page: targetPage,
@@ -575,7 +760,11 @@ export async function loadHistoryPage(page = 1) {
     return logs;
   } catch (err) {
     setRequestError(err, {
-      retryAction: () => loadHistoryPage(targetPage),
+      retryAction: () =>
+        loadHistoryPage(targetPage, {
+          query: state.historyQuery,
+          sort: state.historySort,
+        }),
       retryLabel: "Retry loading history",
     });
     throw err;
@@ -587,6 +776,139 @@ export async function loadHistoryPage(page = 1) {
 export async function changeHistoryFilter(filterValue) {
   state.historyFilter = filterValue;
   await loadHistoryPage(1);
+}
+
+export async function changeHistoryQuery(query) {
+  state.historyQuery = String(query || "").trim();
+  await loadHistoryPage(1);
+}
+
+export async function changeHistorySort(sortValue) {
+  state.historySort = HISTORY_SORTS.has(sortValue) ? sortValue : "newest";
+  await loadHistoryPage(1);
+}
+
+export async function loadSavedPage(page = 1, options = {}) {
+  const targetPage = Math.max(1, Number(page || 1));
+  const query = options.query !== undefined ? String(options.query).trim() : state.savedQuery;
+  const sort = options.sort || state.savedSort || "newest";
+
+  if (options.query !== undefined) {
+    state.savedQuery = query;
+  }
+  if (options.sort) {
+    state.savedSort = HISTORY_SORTS.has(options.sort) ? options.sort : "newest";
+  }
+
+  state.busy.saved = true;
+  clearFormErrors("saved");
+  try {
+    const saved = await fetchSaved(targetPage, query, state.savedSort);
+    updateSaved({
+      ...saved,
+      page: targetPage,
+    });
+    state.error = "";
+    clearRetry();
+    return saved;
+  } catch (err) {
+    setRequestError(err, {
+      fieldScope: "saved",
+      retryAction: () =>
+        loadSavedPage(targetPage, {
+          query: state.savedQuery,
+          sort: state.savedSort,
+        }),
+      retryLabel: "Retry loading saved",
+    });
+    throw err;
+  } finally {
+    state.busy.saved = false;
+  }
+}
+
+export async function changeSavedQuery(query) {
+  state.savedQuery = String(query || "").trim();
+  await loadSavedPage(1);
+}
+
+export async function changeSavedSort(sortValue) {
+  state.savedSort = HISTORY_SORTS.has(sortValue) ? sortValue : "newest";
+  await loadSavedPage(1);
+}
+
+export async function saveCurrentSuggestion() {
+  if (!state.suggestion?.id) {
+    return null;
+  }
+
+  state.busy.saved = true;
+  clearFormErrors("saved");
+  try {
+    const result = await createSaved({ suggestion_id: state.suggestion.id });
+    try {
+      await loadSavedPage(1);
+    } catch {
+      // Saved refresh failure is already handled by loadSavedPage retry state.
+    }
+    if (!state.error) {
+      setNotice("Saved for later.");
+    }
+    return result;
+  } catch (err) {
+    setRequestError(err, {
+      fieldScope: "saved",
+      retryAction: () => saveCurrentSuggestion(),
+      retryLabel: "Retry saving",
+    });
+    throw err;
+  } finally {
+    state.busy.saved = false;
+  }
+}
+
+export async function deleteSavedItem(item) {
+  if (!item?.id) {
+    return;
+  }
+
+  state.busy.saved = true;
+  try {
+    const deletedSnapshot = {
+      suggestion_id: item.suggestion_id,
+    };
+    await destroySaved(item.id);
+    const currentPage = Math.max(1, Number(state.savedPagination.page || 1));
+    const targetPage = state.savedItems.length === 1 && currentPage > 1
+      ? currentPage - 1
+      : currentPage;
+
+    try {
+      await loadSavedPage(targetPage);
+    } catch {
+      // Saved refresh failure is already handled by loadSavedPage retry state.
+    }
+
+    if (!state.error) {
+      setNotice("Saved item removed.", { preserveUndo: true });
+      setUndo("Saved item removed.", async () => {
+        await createSaved({ suggestion_id: deletedSnapshot.suggestion_id });
+        await loadSavedPage(1, {
+          query: state.savedQuery,
+          sort: state.savedSort,
+        });
+        setNotice("Saved item restored.");
+      });
+    }
+  } catch (err) {
+    setRequestError(err, {
+      retryAction: () => deleteSavedItem(item),
+      retryLabel: "Retry removing saved item",
+    });
+    throw err;
+  } finally {
+    state.busy.saved = false;
+  }
 }
 
 export function toggleCategoryGroup(categories) {
@@ -629,12 +951,16 @@ export async function generateSuggestion() {
 
     const result = await generateActivity({
       ...state.constraints,
-      budget: String(state.constraints.budget),
+      budget: String(getBudgetCap(state.constraints.budget_preference)),
     });
     state.suggestion = result;
     resetFeedback();
     clearFormErrors("completion");
-    setNotice("Generated a new suggestion.");
+    if (result.cooldown_relaxed && result.cooldown_message) {
+      setNotice(result.cooldown_message);
+    } else {
+      setNotice("Generated a new suggestion.");
+    }
     return result;
   } catch (err) {
     if (err?.isValidation) {
@@ -663,7 +989,11 @@ export async function rerollSuggestion() {
     state.suggestion = result;
     resetFeedback();
     clearFormErrors("completion");
-    setNotice("Generated another option.");
+    if (result.cooldown_relaxed && result.cooldown_message) {
+      setNotice(result.cooldown_message);
+    } else {
+      setNotice("Generated another option.");
+    }
     return result;
   } catch (err) {
     setRequestError(err, {
@@ -766,6 +1096,12 @@ export async function deleteHistoryLog(log) {
 
   state.busy.deleteLog = true;
   try {
+    const deletedSnapshot = {
+      suggestion_id: log.suggestion_id,
+      status: log.status,
+      rating: log.rating,
+      comment: log.comment || "",
+    };
     await destroyLog(log.id);
 
     if (state.pendingLog?.id === log.id) {
@@ -791,7 +1127,29 @@ export async function deleteHistoryLog(log) {
     }
 
     if (!state.error) {
-      setNotice("History item deleted.");
+      setNotice("History item deleted.", { preserveUndo: true });
+      setUndo("History item deleted.", async () => {
+        await acceptSuggestion(deletedSnapshot.suggestion_id);
+        if (deletedSnapshot.status !== "ACCEPTED") {
+          const restorePayload = {
+            suggestion_id: deletedSnapshot.suggestion_id,
+            status: deletedSnapshot.status,
+            comment: deletedSnapshot.comment,
+          };
+          if (
+            deletedSnapshot.status === "COMPLETED"
+            && Number.isInteger(Number(deletedSnapshot.rating))
+          ) {
+            restorePayload.rating = Number(deletedSnapshot.rating);
+          }
+          await createLog(restorePayload);
+        }
+        await loadHistoryPage(1, {
+          query: state.historyQuery,
+          sort: state.historySort,
+        });
+        setNotice("History item restored.");
+      });
     }
   } catch (err) {
     setRequestError(err, {
@@ -802,6 +1160,27 @@ export async function deleteHistoryLog(log) {
   } finally {
     state.busy.deleteLog = false;
   }
+}
+
+export function setUiPreference(key, value) {
+  if (!Object.prototype.hasOwnProperty.call(state.uiPrefs, key)) {
+    return;
+  }
+
+  state.uiPrefs = {
+    ...state.uiPrefs,
+    [key]: Boolean(value),
+  };
+  persistUiPrefs(state.uiPrefs);
+  applyUiPrefsClasses(state.uiPrefs);
+}
+
+export function toggleUiPreference(key) {
+  if (!Object.prototype.hasOwnProperty.call(state.uiPrefs, key)) {
+    return;
+  }
+
+  setUiPreference(key, !state.uiPrefs[key]);
 }
 
 export async function retryLastRequest() {
@@ -819,5 +1198,148 @@ export async function retryLastRequest() {
     // Error state is repopulated by the retried action.
   } finally {
     state.busy.retry = false;
+  }
+}
+
+export async function undoLastDelete() {
+  if (!undoAction) {
+    return;
+  }
+
+  const action = undoAction;
+  clearUndo();
+  state.busy.retry = true;
+  try {
+    await action();
+  } catch (err) {
+    setRequestError(err, {
+      retryAction: async () => {
+        await action();
+      },
+      retryLabel: "Retry undo",
+    });
+    throw err;
+  } finally {
+    state.busy.retry = false;
+  }
+}
+
+export async function loadAdminActivitiesList() {
+  state.busy.admin = true;
+  clearFormErrors("admin");
+  try {
+    const result = await fetchAdminActivities();
+    state.error = "";
+    clearRetry();
+    return result;
+  } catch (err) {
+    setRequestError(err, {
+      fieldScope: "admin",
+      retryAction: () => loadAdminActivitiesList(),
+      retryLabel: "Retry loading admin activities",
+    });
+    throw err;
+  } finally {
+    state.busy.admin = false;
+  }
+}
+
+export async function loadAdminAuditLogs(page = 1) {
+  const targetPage = Math.max(1, Number(page || 1));
+  state.busy.admin = true;
+  clearFormErrors("admin");
+  try {
+    const result = await fetchAdminAuditLogs(targetPage);
+    updateAdminAudit({
+      ...result,
+      page: targetPage,
+    });
+    state.error = "";
+    clearRetry();
+    return result;
+  } catch (err) {
+    setRequestError(err, {
+      fieldScope: "admin",
+      retryAction: () => loadAdminAuditLogs(targetPage),
+      retryLabel: "Retry loading audit logs",
+    });
+    throw err;
+  } finally {
+    state.busy.admin = false;
+  }
+}
+
+export async function createAdminActivityEntry(payload) {
+  state.busy.admin = true;
+  clearFormErrors("admin");
+  try {
+    const result = await createAdminActivity(payload);
+    setNotice("Activity created.");
+    return result;
+  } catch (err) {
+    setRequestError(err, {
+      fieldScope: "admin",
+      retryAction: () => createAdminActivityEntry(payload),
+      retryLabel: "Retry creating activity",
+    });
+    throw err;
+  } finally {
+    state.busy.admin = false;
+  }
+}
+
+export async function updateAdminActivityEntry(activityId, payload) {
+  state.busy.admin = true;
+  clearFormErrors("admin");
+  try {
+    const result = await updateAdminActivity(activityId, payload);
+    setNotice("Activity updated.");
+    return result;
+  } catch (err) {
+    setRequestError(err, {
+      fieldScope: "admin",
+      retryAction: () => updateAdminActivityEntry(activityId, payload),
+      retryLabel: "Retry updating activity",
+    });
+    throw err;
+  } finally {
+    state.busy.admin = false;
+  }
+}
+
+export async function deleteAdminActivityEntry(activityId) {
+  state.busy.admin = true;
+  clearFormErrors("admin");
+  try {
+    await deleteAdminActivity(activityId);
+    setNotice("Activity deleted.");
+  } catch (err) {
+    setRequestError(err, {
+      fieldScope: "admin",
+      retryAction: () => deleteAdminActivityEntry(activityId),
+      retryLabel: "Retry deleting activity",
+    });
+    throw err;
+  } finally {
+    state.busy.admin = false;
+  }
+}
+
+export async function importAdminActivitiesFromCsv(file) {
+  state.busy.admin = true;
+  clearFormErrors("admin");
+  try {
+    const result = await importAdminActivitiesCsv(file);
+    setNotice(`CSV imported. Created ${result.created}, failed ${result.failed}.`);
+    return result;
+  } catch (err) {
+    setRequestError(err, {
+      fieldScope: "admin",
+      retryAction: () => importAdminActivitiesFromCsv(file),
+      retryLabel: "Retry CSV import",
+    });
+    throw err;
+  } finally {
+    state.busy.admin = false;
   }
 }

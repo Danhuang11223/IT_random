@@ -29,7 +29,7 @@ async function submit() {
 </script>
 
 <template>
-  <section class="panel auth-panel wide-panel">
+  <section class="panel auth-panel wide-panel auth-form-card">
     <div class="panel-heading">
       <h2>Sign in</h2>
       <p>Use your account to jump back in.</p>

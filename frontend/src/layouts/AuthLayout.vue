@@ -11,6 +11,10 @@ import { RouterLink, RouterView } from "vue-router";
         Generate a random activity based on your mood, time, and preferences.
       </p>
       <p class="showcase-note">No more "maybe later."</p>
+      <div class="showcase-mascot" aria-hidden="true">
+        <span class="showcase-mascot-face">👾</span>
+        <span class="showcase-mascot-copy">I spin tiny adventures for your day.</span>
+      </div>
 
       <div class="showcase-points">
         <div class="showcase-chip">Set limits</div>

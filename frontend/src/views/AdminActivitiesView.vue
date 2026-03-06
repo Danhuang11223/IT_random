@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted } from "vue";
 
-import ConstraintForm from "../components/ConstraintForm.vue";
+import AdminActivityManager from "../components/AdminActivityManager.vue";
 import { loadDashboardData, state } from "../state";
 
 onMounted(async () => {
@@ -18,7 +18,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="single-column generator-flow-single">
-    <ConstraintForm />
+  <main class="single-column history-flow">
+    <AdminActivityManager />
   </main>
 </template>

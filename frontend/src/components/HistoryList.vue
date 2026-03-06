@@ -1,9 +1,13 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
+import { RouterLink } from "vue-router";
 
 import { getCategoryOption } from "../categoryOptions";
+import CalendarModal from "./CalendarModal.vue";
 import {
   changeHistoryFilter,
+  changeHistoryQuery,
+  changeHistorySort,
   createActivityLog,
   deleteHistoryLog,
   historyPageNumbers,
@@ -16,11 +20,27 @@ const pendingSuggestion = computed(() => state.pendingLog);
 const actionButtonsDisabled = computed(
   () => state.busy.history || state.busy.log || state.busy.deleteLog
 );
+const localQuery = ref(state.historyQuery);
+const selectedCalendarActivity = ref(null);
+const calendarOpen = ref(false);
+const ratingOptions = [1, 2, 3, 4, 5];
 const filters = [
   { label: "All", value: "ALL" },
   { label: "Completed", value: "COMPLETED" },
   { label: "Skipped", value: "SKIPPED" },
 ];
+const sortOptions = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "title", label: "Title A-Z" },
+];
+
+watch(
+  () => state.historyQuery,
+  (value) => {
+    localQuery.value = value;
+  }
+);
 
 async function handlePageChange(page) {
   try {
@@ -65,10 +85,43 @@ async function handleDelete(log) {
     // Error state is handled in shared state.
   }
 }
+
+async function handleQuerySubmit() {
+  try {
+    await changeHistoryQuery(localQuery.value);
+  } catch {
+    // Error state is handled in shared state.
+  }
+}
+
+async function handleSortChange(event) {
+  try {
+    await changeHistorySort(event.target.value);
+  } catch {
+    // Error state is handled in shared state.
+  }
+}
+
+function openCalendar(activity) {
+  selectedCalendarActivity.value = activity;
+  calendarOpen.value = true;
+}
+
+function setRating(value) {
+  state.completionForm.rating = String(value);
+}
+
+function clearRating() {
+  state.completionForm.rating = "";
+}
+
+function isRatingActive(value) {
+  return Number(state.completionForm.rating || 0) === value;
+}
 </script>
 
 <template>
-  <section class="panel history-panel wide-panel">
+  <section class="panel history-panel wide-panel history-board-card">
     <div class="panel-heading">
       <h2>Activity History</h2>
       <p>What you've tried so far. Kept it — or skipped it.</p>
@@ -92,14 +145,23 @@ async function handleDelete(log) {
         </p>
 
         <label class="field">
-          <span>Rating (optional, saved only when marked done)</span>
-          <input
-            v-model="state.completionForm.rating"
-            type="number"
-            min="1"
-            max="5"
-            :class="{ 'invalid-input': state.formErrors.completion.rating }"
-          />
+          <span>Rating (optional)</span>
+          <div class="rating-stars">
+            <button
+              v-for="rating in ratingOptions"
+              :key="rating"
+              type="button"
+              class="star-chip"
+              :class="{ active: isRatingActive(rating) }"
+              :aria-pressed="isRatingActive(rating)"
+              @click="setRating(rating)"
+            >
+              {{ "★".repeat(rating) }}
+            </button>
+            <button type="button" class="ghost-button small-button" @click="clearRating">
+              Clear
+            </button>
+          </div>
           <small v-if="state.formErrors.completion.rating" class="field-error">
             {{ state.formErrors.completion.rating }}
           </small>
@@ -109,7 +171,8 @@ async function handleDelete(log) {
           <span>Notes (optional)</span>
           <textarea
             v-model="state.completionForm.comment"
-            rows="3"
+            rows="2"
+            class="notes-compact"
             :class="{ 'invalid-input': state.formErrors.completion.comment }"
           />
           <small v-if="state.formErrors.completion.comment" class="field-error">
@@ -118,6 +181,14 @@ async function handleDelete(log) {
         </label>
 
         <div class="button-row">
+          <button
+            class="ghost-button"
+            :disabled="actionButtonsDisabled"
+            @click="openCalendar(pendingSuggestion.activity)"
+          >
+            Add to Calendar
+          </button>
+
           <button
             class="primary-button"
             :disabled="actionButtonsDisabled"
@@ -145,7 +216,7 @@ async function handleDelete(log) {
       </div>
     </div>
 
-    <div class="history-toolbar">
+    <div class="history-toolbar stack-on-mobile">
       <div class="filter-group">
         <button
           v-for="filter in filters"
@@ -159,6 +230,36 @@ async function handleDelete(log) {
           {{ filter.label }}
         </button>
       </div>
+
+      <form class="search-form" @submit.prevent="handleQuerySubmit">
+        <label for="history-search" class="sr-only">Search history</label>
+        <input
+          id="history-search"
+          v-model="localQuery"
+          type="search"
+          placeholder="Search title or notes"
+        />
+        <button class="ghost-button small-button" :disabled="state.busy.history">
+          Search
+        </button>
+      </form>
+
+      <label class="sort-control">
+        <span>Sort</span>
+        <select
+          :value="state.historySort"
+          :disabled="state.busy.history"
+          @change="handleSortChange"
+        >
+          <option
+            v-for="option in sortOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
     </div>
 
     <div
@@ -189,6 +290,11 @@ async function handleDelete(log) {
           {{ getCategoryOption(item.activity.category).label }} · Rating {{ item.rating ?? "-" }}
         </p>
         <p v-if="item.comment" class="history-comment">{{ item.comment }}</p>
+        <div class="button-row">
+          <button class="ghost-button small-button" @click="openCalendar(item.activity)">
+            Add to Calendar
+          </button>
+        </div>
       </li>
     </ul>
 
@@ -235,14 +341,30 @@ async function handleDelete(log) {
       </button>
     </div>
 
-    <div v-else class="empty-state">
-      <p>
+    <div v-else class="empty-state playful-empty">
+      <div class="empty-illustration" aria-hidden="true">🗂️</div>
+      <p class="empty-title">
         {{
           pendingSuggestion
-            ? "Nothing here yet. Finish the current item first."
-            : "Nothing here yet. Start with ✨ Generate Activity."
+            ? "No history yet. Finish the current suggestion first."
+            : "Nothing here yet."
         }}
       </p>
+      <p class="empty-subtitle">
+        {{
+          pendingSuggestion
+            ? "Mark it as done or skipped, and it will show up here."
+            : "Start with ✨ Surprise me and build your activity trail."
+        }}
+      </p>
+      <RouterLink v-if="!pendingSuggestion" class="primary-link empty-cta" to="/dashboard">
+        Go to Generator
+      </RouterLink>
     </div>
+
+    <CalendarModal
+      v-model="calendarOpen"
+      :activity="selectedCalendarActivity"
+    />
   </section>
 </template>

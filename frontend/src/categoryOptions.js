@@ -1,3 +1,9 @@
+import getInspiredGif from "./assets/category-gifs/get-inspired.gif";
+import goOutGif from "./assets/category-gifs/go-out.gif";
+import goodFoodGif from "./assets/category-gifs/good-food.gif";
+import stayActiveGif from "./assets/category-gifs/stay-active.gif";
+import stayInGif from "./assets/category-gifs/stay-in.gif";
+
 const CATEGORY_OPTIONS = {
   CLASS: {
     label: "Class",
@@ -36,31 +42,41 @@ const CATEGORY_OPTIONS = {
 export const EXCLUDE_CATEGORY_GROUPS = [
   {
     key: "indoor",
-    label: "🏠 Stay in",
+    label: "Stay in",
+    icon: "stay-in",
+    iconSrc: stayInGif,
     rawValues: ["INDOOR", "HOME", "SOCIAL"],
     order: 10,
   },
   {
     key: "outdoor",
-    label: "🌤 Go out",
+    label: "Go out",
+    icon: "go-out",
+    iconSrc: goOutGif,
     rawValues: ["OUTDOOR"],
     order: 20,
   },
   {
     key: "food-drink",
-    label: "🍽 Good food",
+    label: "Good food",
+    icon: "good-food",
+    iconSrc: goodFoodGif,
     rawValues: ["FOOD"],
     order: 30,
   },
   {
     key: "exercise",
-    label: "🏃 Stay active",
+    label: "Stay active",
+    icon: "stay-active",
+    iconSrc: stayActiveGif,
     rawValues: ["FITNESS"],
     order: 40,
   },
   {
     key: "culture-learning",
-    label: "🎨 Get inspired",
+    label: "Get inspired",
+    icon: "get-inspired",
+    iconSrc: getInspiredGif,
     rawValues: ["CULTURE", "CLASS"],
     order: 50,
   },

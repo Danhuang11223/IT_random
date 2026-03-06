@@ -30,7 +30,7 @@ async function submit() {
 </script>
 
 <template>
-  <section class="panel auth-panel wide-panel">
+  <section class="panel auth-panel wide-panel auth-form-card">
     <div class="panel-heading">
       <h2>Create account</h2>
       <p>Set up a new account and start right away.</p>

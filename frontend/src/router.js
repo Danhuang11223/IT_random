@@ -7,6 +7,7 @@ import DashboardView from "./views/DashboardView.vue";
 import HistoryView from "./views/HistoryView.vue";
 import LoginView from "./views/LoginView.vue";
 import RegisterView from "./views/RegisterView.vue";
+import SavedView from "./views/SavedView.vue";
 
 const routes = [
   {
@@ -44,6 +45,11 @@ const routes = [
         path: "history",
         name: "history",
         component: HistoryView,
+      },
+      {
+        path: "saved",
+        name: "saved",
+        component: SavedView,
       },
     ],
   },
