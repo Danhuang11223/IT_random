@@ -39,6 +39,9 @@ Use only changes you actually made and can justify. Suitable examples for this p
 - Used reusable components instead of duplicated markup
 - Removed unnecessary decorative media from the primary user flow
 - Kept front-end API calls scoped to the current view instead of loading everything at once
+- Added pagination/search/sort on history and saved APIs to avoid loading long lists at once
+- Reused one calendar modal component for three contexts (generator/history/saved) instead of duplicating logic
+- Added optional reduced-motion mode that can reduce animation cost on low-power devices
 
 If you make further changes, list them here.
 

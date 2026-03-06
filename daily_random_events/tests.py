@@ -1,9 +1,20 @@
+import io
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient, APITestCase
 
-from .models import Activity, ActivityLog, Suggestion
+from .models import (
+    Activity,
+    ActivityLog,
+    AdminAuditLog,
+    GenerationRequest,
+    SavedSuggestion,
+    Suggestion,
+)
 from .views import _rank_candidate_activities
 
 User = get_user_model()
@@ -91,6 +102,17 @@ class DailyRandomEventsAPITests(APITestCase):
             "excluded_categories": ["OUTDOOR"],
         }
 
+    def _create_request_for_user(self, user, **overrides):
+        defaults = {
+            "time_minutes": 60,
+            "budget": "20.00",
+            "mood": GenerationRequest.Mood.LOW,
+            "social_preference": GenerationRequest.SocialPreference.SOLO,
+            "excluded_categories": [],
+        }
+        defaults.update(overrides)
+        return GenerationRequest.objects.create(user=user, **defaults)
+
     def test_register_returns_token_and_normalized_email(self):
         response = self.client.post(
             "/api/auth/register/",
@@ -121,6 +143,7 @@ class DailyRandomEventsAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("token", response.data)
         self.assertEqual(response.data["user"]["username"], "member")
+        self.assertFalse(response.data["user"]["is_staff"])
 
     def test_metadata_requires_authentication(self):
         response = self.client.get("/api/metadata/")
@@ -147,11 +170,19 @@ class DailyRandomEventsAPITests(APITestCase):
                 "activity",
                 "fallback_applied",
                 "fallback_message",
+                "cooldown_relaxed",
+                "cooldown_message",
+                "explainability",
             },
         )
         self.assertIn("title", generate_response.data["activity"])
         self.assertFalse(generate_response.data["fallback_applied"])
         self.assertEqual(generate_response.data["fallback_message"], "")
+        self.assertFalse(generate_response.data["cooldown_relaxed"])
+        self.assertEqual(generate_response.data["cooldown_message"], "")
+        self.assertIn("hard_constraints", generate_response.data["explainability"])
+        self.assertIn("soft_preferences", generate_response.data["explainability"])
+        self.assertIn("system", generate_response.data["explainability"])
         self.assertNotEqual(
             generate_response.data["activity"]["id"],
             self.excluded_outdoor.id,
@@ -189,6 +220,7 @@ class DailyRandomEventsAPITests(APITestCase):
         )
         self.assertEqual(reroll_response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(reroll_response.data["rank_no"], 2)
+        self.assertIn("explainability", reroll_response.data)
         self.assertNotEqual(reroll_response.data["id"], first_suggestion.id)
         self.assertNotEqual(
             reroll_response.data["activity"]["id"],
@@ -508,6 +540,46 @@ class DailyRandomEventsAPITests(APITestCase):
         pending_suggestion = Suggestion.objects.get(id=pending_suggestion_id)
         self.assertFalse(pending_suggestion.is_accepted)
 
+    def test_accept_new_suggestion_auto_skips_existing_pending_from_other_request(self):
+        client = self._auth_client(self.user)
+
+        first_response = client.post(
+            "/api/generate/",
+            self._default_generate_payload(),
+            format="json",
+        )
+        first_suggestion_id = first_response.data["id"]
+        accept_first = client.post(
+            f"/api/suggestions/{first_suggestion_id}/accept/",
+            {},
+            format="json",
+        )
+        self.assertEqual(accept_first.status_code, status.HTTP_200_OK)
+
+        second_response = client.post(
+            "/api/generate/",
+            self._default_generate_payload(),
+            format="json",
+        )
+        second_suggestion_id = second_response.data["id"]
+        accept_second = client.post(
+            f"/api/suggestions/{second_suggestion_id}/accept/",
+            {},
+            format="json",
+        )
+        self.assertEqual(accept_second.status_code, status.HTTP_200_OK)
+
+        first_suggestion = Suggestion.objects.get(id=first_suggestion_id)
+        second_suggestion = Suggestion.objects.get(id=second_suggestion_id)
+        self.assertFalse(first_suggestion.is_accepted)
+        self.assertTrue(second_suggestion.is_accepted)
+
+        first_log = ActivityLog.objects.get(suggestion=first_suggestion)
+        second_log = ActivityLog.objects.get(suggestion=second_suggestion)
+        self.assertEqual(first_log.status, ActivityLog.Status.SKIPPED)
+        self.assertIn("Auto-skipped", first_log.comment)
+        self.assertEqual(second_log.status, ActivityLog.Status.ACCEPTED)
+
     def test_logs_reject_invalid_status_filter(self):
         client = self._auth_client(self.user)
 
@@ -517,6 +589,289 @@ class DailyRandomEventsAPITests(APITestCase):
         self.assertEqual(
             response.data["status"][0],
             "Invalid status filter. Use COMPLETED or SKIPPED.",
+        )
+
+    def test_saved_suggestions_create_list_delete_and_allow_continued_generation(self):
+        client = self._auth_client(self.user)
+        payload = self._default_generate_payload()
+
+        generate_response = client.post("/api/generate/", payload, format="json")
+        self.assertEqual(generate_response.status_code, status.HTTP_201_CREATED)
+        suggestion_id = generate_response.data["id"]
+
+        save_response = client.post(
+            "/api/saved/",
+            {"suggestion_id": suggestion_id},
+            format="json",
+        )
+        self.assertEqual(save_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(save_response.data["suggestion_id"], suggestion_id)
+        self.assertIn("activity", save_response.data)
+        self.assertFalse(
+            ActivityLog.objects.filter(
+                suggestion_id=suggestion_id,
+                status=ActivityLog.Status.ACCEPTED,
+            ).exists()
+        )
+
+        second_generate = client.post("/api/generate/", payload, format="json")
+        self.assertEqual(second_generate.status_code, status.HTTP_201_CREATED)
+
+        duplicate_save = client.post(
+            "/api/saved/",
+            {"suggestion_id": suggestion_id},
+            format="json",
+        )
+        self.assertEqual(duplicate_save.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("suggestion_id", duplicate_save.data)
+
+        list_response = client.get("/api/saved/?page=1")
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_response.data["count"], 1)
+        saved_id = list_response.data["results"][0]["id"]
+
+        delete_response = client.delete(f"/api/saved/{saved_id}/")
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(SavedSuggestion.objects.filter(id=saved_id).exists())
+
+    def test_saved_suggestions_reject_other_users_suggestion(self):
+        owner_client = self._auth_client(self.user)
+        other_client = self._auth_client(self.other_user)
+        payload = self._default_generate_payload()
+
+        generate_response = owner_client.post("/api/generate/", payload, format="json")
+        self.assertEqual(generate_response.status_code, status.HTTP_201_CREATED)
+
+        save_response = other_client.post(
+            "/api/saved/",
+            {"suggestion_id": generate_response.data["id"]},
+            format="json",
+        )
+        self.assertEqual(save_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_saved_suggestions_support_search_and_sort(self):
+        client = self._auth_client(self.user)
+        request = self._create_request_for_user(self.user)
+        alpha = self._create_activity(
+            title="Alpha Calm Walk",
+            description="A calm route around the block.",
+            min_time_minutes=10,
+            max_budget="5.00",
+            mood_tags=["low"],
+            social_type=Activity.SocialType.EITHER,
+        )
+        beta = self._create_activity(
+            title="Beta Tea Break",
+            description="Tea and a short journal.",
+            min_time_minutes=10,
+            max_budget="5.00",
+            mood_tags=["low"],
+            social_type=Activity.SocialType.EITHER,
+        )
+        alpha_suggestion = Suggestion.objects.create(
+            request=request,
+            activity=alpha,
+            rank_no=1,
+        )
+        beta_suggestion = Suggestion.objects.create(
+            request=request,
+            activity=beta,
+            rank_no=2,
+        )
+        older = timezone.now() - timedelta(days=2)
+        newer = timezone.now() - timedelta(days=1)
+        SavedSuggestion.objects.create(user=self.user, suggestion=beta_suggestion)
+        first_saved = SavedSuggestion.objects.create(user=self.user, suggestion=alpha_suggestion)
+        SavedSuggestion.objects.filter(id=first_saved.id).update(created_at=older)
+        SavedSuggestion.objects.filter(suggestion=beta_suggestion).update(created_at=newer)
+
+        newest = client.get("/api/saved/?sort=newest")
+        self.assertEqual(newest.status_code, status.HTTP_200_OK)
+        self.assertEqual(newest.data["results"][0]["activity"]["title"], "Beta Tea Break")
+
+        oldest = client.get("/api/saved/?sort=oldest")
+        self.assertEqual(oldest.status_code, status.HTTP_200_OK)
+        self.assertEqual(oldest.data["results"][0]["activity"]["title"], "Alpha Calm Walk")
+
+        title_sorted = client.get("/api/saved/?sort=title")
+        self.assertEqual(title_sorted.status_code, status.HTTP_200_OK)
+        self.assertEqual(title_sorted.data["results"][0]["activity"]["title"], "Alpha Calm Walk")
+
+        search = client.get("/api/saved/?q=journal")
+        self.assertEqual(search.status_code, status.HTTP_200_OK)
+        self.assertEqual(search.data["count"], 1)
+        self.assertEqual(search.data["results"][0]["activity"]["title"], "Beta Tea Break")
+
+    def test_logs_support_search_and_sort(self):
+        client = self._auth_client(self.user)
+        request_one = self._create_request_for_user(self.user)
+        request_two = self._create_request_for_user(self.user)
+        alpha = self._create_activity(
+            title="Alpha Stretch",
+            description="Stretch and reset.",
+            min_time_minutes=10,
+            max_budget="5.00",
+            mood_tags=["low"],
+            social_type=Activity.SocialType.EITHER,
+        )
+        beta = self._create_activity(
+            title="Beta Journal",
+            description="Write a short page.",
+            min_time_minutes=10,
+            max_budget="5.00",
+            mood_tags=["low"],
+            social_type=Activity.SocialType.EITHER,
+        )
+        alpha_suggestion = Suggestion.objects.create(
+            request=request_one,
+            activity=alpha,
+            rank_no=1,
+            is_accepted=True,
+        )
+        beta_suggestion = Suggestion.objects.create(
+            request=request_two,
+            activity=beta,
+            rank_no=1,
+            is_accepted=True,
+        )
+
+        first_log = ActivityLog.objects.create(
+            user=self.user,
+            suggestion=alpha_suggestion,
+            status=ActivityLog.Status.COMPLETED,
+            rating=4,
+            comment="cozy routine",
+        )
+        second_log = ActivityLog.objects.create(
+            user=self.user,
+            suggestion=beta_suggestion,
+            status=ActivityLog.Status.SKIPPED,
+            comment="too late today",
+        )
+        older = timezone.now() - timedelta(days=2)
+        newer = timezone.now() - timedelta(days=1)
+        ActivityLog.objects.filter(id=first_log.id).update(created_at=older)
+        ActivityLog.objects.filter(id=second_log.id).update(created_at=newer)
+
+        newest = client.get("/api/logs/?sort=newest")
+        self.assertEqual(newest.status_code, status.HTTP_200_OK)
+        self.assertEqual(newest.data["results"][0]["activity"]["title"], "Beta Journal")
+
+        oldest = client.get("/api/logs/?sort=oldest")
+        self.assertEqual(oldest.status_code, status.HTTP_200_OK)
+        self.assertEqual(oldest.data["results"][0]["activity"]["title"], "Alpha Stretch")
+
+        title_sorted = client.get("/api/logs/?sort=title")
+        self.assertEqual(title_sorted.status_code, status.HTTP_200_OK)
+        self.assertEqual(title_sorted.data["results"][0]["activity"]["title"], "Alpha Stretch")
+
+        search = client.get("/api/logs/?q=cozy")
+        self.assertEqual(search.status_code, status.HTTP_200_OK)
+        self.assertEqual(search.data["count"], 1)
+        self.assertEqual(search.data["results"][0]["activity"]["title"], "Alpha Stretch")
+
+        invalid_sort = client.get("/api/logs/?sort=priority")
+        self.assertEqual(invalid_sort.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            invalid_sort.data["sort"][0],
+            "Invalid sort value. Use newest, oldest, or title.",
+        )
+
+    def test_generate_avoids_recent_duplicates_within_7_day_window(self):
+        client = self._auth_client(self.user)
+        recent_activity = self._create_activity(
+            title="Recent Option",
+            category="TEST",
+            min_time_minutes=10,
+            max_budget="5.00",
+            mood_tags=["low"],
+            social_type=Activity.SocialType.EITHER,
+        )
+        fresh_activity = self._create_activity(
+            title="Fresh Option",
+            category="TEST",
+            min_time_minutes=10,
+            max_budget="5.00",
+            mood_tags=["low"],
+            social_type=Activity.SocialType.EITHER,
+        )
+        request = self._create_request_for_user(
+            self.user,
+            time_minutes=10,
+            budget="5.00",
+            mood=GenerationRequest.Mood.LOW,
+            social_preference=GenerationRequest.SocialPreference.SOLO,
+        )
+        recent_suggestion = Suggestion.objects.create(
+            request=request,
+            activity=recent_activity,
+            rank_no=1,
+        )
+        Suggestion.objects.filter(id=recent_suggestion.id).update(
+            created_at=timezone.now() - timedelta(days=1)
+        )
+
+        response = client.post(
+            "/api/generate/",
+            {
+                "time_minutes": 10,
+                "budget": "5.00",
+                "mood": "low",
+                "social_preference": "SOLO",
+                "excluded_categories": [],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["activity"]["id"], fresh_activity.id)
+        self.assertFalse(response.data["cooldown_relaxed"])
+        self.assertEqual(response.data["cooldown_message"], "")
+
+    def test_generate_relaxes_cooldown_once_when_only_recent_activity_exists(self):
+        client = self._auth_client(self.user)
+        only_option = self._create_activity(
+            title="Only Cooldown Candidate",
+            category="TEST",
+            min_time_minutes=10,
+            max_budget="5.00",
+            mood_tags=["low"],
+            social_type=Activity.SocialType.EITHER,
+        )
+        request = self._create_request_for_user(
+            self.user,
+            time_minutes=10,
+            budget="5.00",
+            mood=GenerationRequest.Mood.LOW,
+            social_preference=GenerationRequest.SocialPreference.SOLO,
+        )
+        recent_suggestion = Suggestion.objects.create(
+            request=request,
+            activity=only_option,
+            rank_no=1,
+        )
+        Suggestion.objects.filter(id=recent_suggestion.id).update(
+            created_at=timezone.now() - timedelta(days=1)
+        )
+
+        response = client.post(
+            "/api/generate/",
+            {
+                "time_minutes": 10,
+                "budget": "5.00",
+                "mood": "low",
+                "social_preference": "SOLO",
+                "excluded_categories": [],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["activity"]["id"], only_option.id)
+        self.assertTrue(response.data["cooldown_relaxed"])
+        self.assertEqual(
+            response.data["cooldown_message"],
+            "Nothing fresh from the last 7 days. We relaxed recency once.",
         )
 
     def test_regular_user_cannot_access_admin_activity_endpoint(self):
@@ -529,6 +884,60 @@ class DailyRandomEventsAPITests(APITestCase):
         allowed_response = admin_client.get("/api/admin/activities/")
         self.assertEqual(allowed_response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(allowed_response.data), Activity.objects.count())
+
+    def test_admin_can_delete_and_import_activities_via_csv(self):
+        admin_client = self._auth_client(self.admin_user)
+        target = self._create_activity(
+            title="Delete Via Admin",
+            category="INDOOR",
+            mood_tags=["medium"],
+        )
+
+        delete_response = admin_client.delete(f"/api/admin/activities/{target.id}/")
+        self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Activity.objects.filter(id=target.id).exists())
+        self.assertTrue(
+            AdminAuditLog.objects.filter(
+                action=AdminAuditLog.Action.DELETE_ACTIVITY,
+                admin_user=self.admin_user,
+                target=f"activity:{target.id}",
+            ).exists()
+        )
+
+        csv_payload = (
+            "title,description,category,min_time_minutes,max_time_minutes,"
+            "min_budget,max_budget,mood_tags,social_type,is_outdoor,is_active\n"
+            "CSV Activity,Imported by test,FOOD,15,45,5,18,low|medium,EITHER,false,true\n"
+        )
+        upload = io.BytesIO(csv_payload.encode("utf-8"))
+        upload.name = "activities.csv"
+
+        import_response = admin_client.post(
+            "/api/admin/activities/import-csv/",
+            {"file": upload},
+            format="multipart",
+        )
+        self.assertEqual(import_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(import_response.data["created"], 1)
+        self.assertEqual(import_response.data["failed"], 0)
+        self.assertTrue(Activity.objects.filter(title="CSV Activity").exists())
+        self.assertTrue(
+            AdminAuditLog.objects.filter(
+                action=AdminAuditLog.Action.IMPORT_CSV,
+                admin_user=self.admin_user,
+                target="file:activities.csv",
+            ).exists()
+        )
+
+        audit_response = admin_client.get("/api/admin/audit-logs/?page=1")
+        self.assertEqual(audit_response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(audit_response.data["count"], 2)
+        self.assertIn("action", audit_response.data["results"][0])
+
+    def test_regular_user_cannot_access_admin_audit_logs(self):
+        member_client = self._auth_client(self.user)
+        response = member_client.get("/api/admin/audit-logs/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_users_cannot_log_other_users_suggestions(self):
         owner_client = self._auth_client(self.user)

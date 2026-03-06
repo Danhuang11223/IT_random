@@ -1,22 +1,38 @@
 import random
+import csv
+import io
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Activity, ActivityLog, GenerationRequest, Suggestion
+from .models import (
+    Activity,
+    ActivityLog,
+    AdminAuditLog,
+    GenerationRequest,
+    SavedSuggestion,
+    Suggestion,
+)
 from .serializers import (
+    AdminAuditLogSerializer,
     ActivityLogCreateSerializer,
     ActivityLogSerializer,
     ActivitySerializer,
     GenerateInputSerializer,
     LoginSerializer,
     RegisterSerializer,
+    SavedSuggestionCreateSerializer,
+    SavedSuggestionSerializer,
     SuggestionSerializer,
     UserSummarySerializer,
 )
@@ -34,6 +50,8 @@ LEGACY_MOOD_LEVELS = {
 
 TOP_CANDIDATE_WINDOW = 5
 FALLBACK_NOTICE = "Nothing fits perfectly. We relaxed one preference."
+COOLDOWN_NOTICE = "Nothing fresh from the last 7 days. We relaxed recency once."
+RECENT_SUGGESTION_COOLDOWN_DAYS = 7
 
 
 def _allowed_social_types(preference):
@@ -134,22 +152,123 @@ def _rank_candidate_activities(payload, exclude_ids=None):
     return [item["activity"] for item in ranked], fallback_applied
 
 
-def _choose_activity(payload, exclude_ids=None):
+def _recent_activity_ids_for_user(user):
+    cutoff = timezone.now() - timedelta(days=RECENT_SUGGESTION_COOLDOWN_DAYS)
+    return list(
+        Suggestion.objects.filter(
+            request__user=user,
+            created_at__gte=cutoff,
+        )
+        .values_list("activity_id", flat=True)
+        .distinct()
+    )
+
+
+def _choose_activity(payload, *, exclude_ids=None, cooldown_ids=None):
+    exclude_ids = set(exclude_ids or [])
+    cooldown_ids = set(cooldown_ids or [])
     ranked_candidates, fallback_applied = _rank_candidate_activities(
         payload,
-        exclude_ids=exclude_ids,
+        exclude_ids=list(exclude_ids | cooldown_ids),
     )
+    cooldown_relaxed = False
+
+    if not ranked_candidates and cooldown_ids:
+        ranked_candidates, fallback_applied = _rank_candidate_activities(
+            payload,
+            exclude_ids=list(exclude_ids),
+        )
+        cooldown_relaxed = bool(ranked_candidates)
+
     if not ranked_candidates:
-        return None, False
+        return None, False, False
 
     window_size = min(TOP_CANDIDATE_WINDOW, len(ranked_candidates))
-    return random.choice(ranked_candidates[:window_size]), fallback_applied
+    return random.choice(ranked_candidates[:window_size]), fallback_applied, cooldown_relaxed
 
 
-def _serialize_suggestion_response(suggestion, *, fallback_applied=False):
+def _normalized_money_value(value):
+    number = float(value)
+    if number.is_integer():
+        return int(number)
+    return round(number, 2)
+
+
+def _build_explainability(payload, activity, *, fallback_applied, cooldown_relaxed):
+    mood_token = _normalize_mood_level(payload["mood"])
+    social_preference = payload["social_preference"]
+    energy_match = _activity_matches_mood(activity, mood_token)
+    social_match = _activity_matches_social(activity, social_preference)
+    energy_score = 2 if energy_match else 0
+    social_score = 1 if social_match else 0
+    excluded_categories = payload.get("excluded_categories", [])
+    category_matched = activity.category not in excluded_categories
+    category_relaxed = fallback_applied and not category_matched
+
+    return {
+        "hard_constraints": {
+            "time": {
+                "matched": activity.min_time_minutes <= payload["time_minutes"],
+                "required_minutes": int(payload["time_minutes"]),
+                "activity_min_minutes": activity.min_time_minutes,
+            },
+            "budget": {
+                "matched": float(activity.max_budget) <= float(payload["budget"]),
+                "required_budget": _normalized_money_value(payload["budget"]),
+                "activity_max_budget": _normalized_money_value(activity.max_budget),
+            },
+            "excluded_category": {
+                "matched": category_matched,
+                "relaxed": category_relaxed,
+                "selected": excluded_categories,
+                "activity_category": activity.category,
+            },
+        },
+        "soft_preferences": {
+            "energy": {
+                "matched": energy_match,
+                "score": energy_score,
+                "weight": 2,
+                "requested": mood_token,
+                "activity_tags": [
+                    _normalize_mood_level(tag) for tag in activity.mood_tags
+                ],
+            },
+            "social": {
+                "matched": social_match,
+                "score": social_score,
+                "weight": 1,
+                "requested": social_preference,
+                "activity_social": activity.social_type,
+            },
+            "total_score": energy_score + social_score,
+            "max_score": 3,
+        },
+        "system": {
+            "fallback_applied": fallback_applied,
+            "cooldown_relaxed": cooldown_relaxed,
+        },
+    }
+
+
+def _serialize_suggestion_response(
+    suggestion,
+    payload,
+    *,
+    fallback_applied=False,
+    cooldown_relaxed=False,
+):
     data = SuggestionSerializer(suggestion).data
     data["fallback_applied"] = fallback_applied
     data["fallback_message"] = FALLBACK_NOTICE if fallback_applied else ""
+    data["cooldown_relaxed"] = cooldown_relaxed
+    data["cooldown_message"] = COOLDOWN_NOTICE if cooldown_relaxed else ""
+    data["explainability"] = _build_explainability(
+        payload,
+        suggestion.activity,
+        fallback_applied=fallback_applied,
+        cooldown_relaxed=cooldown_relaxed,
+    )
     return data
 
 
@@ -169,6 +288,18 @@ class ActivityLogPagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = "page_size"
     max_page_size = 50
+
+
+class SavedSuggestionPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 50
+
+
+class AdminAuditLogPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
 
 
 class RegisterView(APIView):
@@ -235,7 +366,10 @@ class GenerateView(APIView):
         serializer.is_valid(raise_exception=True)
         payload = serializer.validated_data
 
-        selected_activity, fallback_applied = _choose_activity(payload)
+        selected_activity, fallback_applied, cooldown_relaxed = _choose_activity(
+            payload,
+            cooldown_ids=_recent_activity_ids_for_user(request.user),
+        )
         if not selected_activity:
             return Response(
                 {"detail": "Nothing fits your time and budget right now."},
@@ -254,7 +388,9 @@ class GenerateView(APIView):
         return Response(
             _serialize_suggestion_response(
                 suggestion,
+                payload,
                 fallback_applied=fallback_applied,
+                cooldown_relaxed=cooldown_relaxed,
             ),
             status=status.HTTP_201_CREATED,
         )
@@ -281,9 +417,10 @@ class RerollView(APIView):
             "social_preference": generation_request.social_preference,
             "excluded_categories": generation_request.excluded_categories,
         }
-        selected_activity, fallback_applied = _choose_activity(
+        selected_activity, fallback_applied, cooldown_relaxed = _choose_activity(
             payload,
             exclude_ids=exclude_ids,
+            cooldown_ids=_recent_activity_ids_for_user(request.user),
         )
         if not selected_activity:
             return Response(
@@ -300,7 +437,9 @@ class RerollView(APIView):
         return Response(
             _serialize_suggestion_response(
                 suggestion,
+                payload,
                 fallback_applied=fallback_applied,
+                cooldown_relaxed=cooldown_relaxed,
             ),
             status=status.HTTP_201_CREATED,
         )
@@ -326,20 +465,20 @@ class AcceptSuggestionView(APIView):
 
         current_pending = _pending_activity_log_for_user(request.user)
         if current_pending and current_pending.suggestion_id != suggestion.id:
+            Suggestion.objects.filter(id=current_pending.suggestion_id).update(
+                is_accepted=False
+            )
             if current_pending.suggestion.request_id == suggestion.request_id:
-                Suggestion.objects.filter(id=current_pending.suggestion_id).update(
-                    is_accepted=False
-                )
                 current_pending.delete()
             else:
-                return Response(
-                    {
-                        "detail": (
-                            "Complete or skip your currently accepted activity "
-                            "before accepting another."
-                        )
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
+                if not current_pending.comment:
+                    current_pending.comment = (
+                        "Auto-skipped after accepting a newer suggestion."
+                    )
+                current_pending.status = ActivityLog.Status.SKIPPED
+                current_pending.rating = None
+                current_pending.save(
+                    update_fields=["status", "rating", "comment", "updated_at"]
                 )
 
         Suggestion.objects.filter(
@@ -367,10 +506,20 @@ class ActivityLogListCreateView(APIView):
 
     def get(self, request):
         status_filter = request.query_params.get("status")
+        query = request.query_params.get("q", "").strip()
+        sort = request.query_params.get("sort", "newest")
+        valid_sorts = {"newest", "oldest", "title"}
         pending_log = _pending_activity_log_for_user(request.user)
         queryset = ActivityLog.objects.filter(user=request.user).exclude(
             status=ActivityLog.Status.ACCEPTED
         ).select_related("suggestion__activity")
+
+        if query:
+            queryset = queryset.filter(
+                Q(suggestion__activity__title__icontains=query)
+                | Q(comment__icontains=query)
+            )
+
         if status_filter:
             valid_statuses = {
                 ActivityLog.Status.COMPLETED,
@@ -386,6 +535,20 @@ class ActivityLogListCreateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             queryset = queryset.filter(status=status_filter)
+
+        if sort not in valid_sorts:
+            return Response(
+                {"sort": ["Invalid sort value. Use newest, oldest, or title."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if sort == "oldest":
+            queryset = queryset.order_by("created_at")
+        elif sort == "title":
+            queryset = queryset.order_by("suggestion__activity__title", "-created_at")
+        else:
+            queryset = queryset.order_by("-created_at")
+
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request, view=self)
         serializer = ActivityLogSerializer(page, many=True)
@@ -430,6 +593,211 @@ class ActivityLogDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class SavedSuggestionListCreateView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = SavedSuggestionPagination
+
+    def get(self, request):
+        query = request.query_params.get("q", "").strip()
+        sort = request.query_params.get("sort", "newest")
+        valid_sorts = {"newest", "oldest", "title"}
+        queryset = SavedSuggestion.objects.filter(user=request.user).select_related(
+            "suggestion__activity",
+            "suggestion__request",
+        )
+
+        if query:
+            queryset = queryset.filter(
+                Q(suggestion__activity__title__icontains=query)
+                | Q(suggestion__activity__description__icontains=query)
+            )
+
+        if sort not in valid_sorts:
+            return Response(
+                {"sort": ["Invalid sort value. Use newest, oldest, or title."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if sort == "oldest":
+            queryset = queryset.order_by("created_at")
+        elif sort == "title":
+            queryset = queryset.order_by("suggestion__activity__title", "-created_at")
+        else:
+            queryset = queryset.order_by("-created_at")
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        serializer = SavedSuggestionSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    def post(self, request):
+        serializer = SavedSuggestionCreateSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        saved_entry = serializer.save()
+        output = SavedSuggestionSerializer(saved_entry)
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+
+class SavedSuggestionDetailView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, saved_id):
+        saved_entry = get_object_or_404(
+            SavedSuggestion,
+            id=saved_id,
+            user=request.user,
+        )
+        saved_entry.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _parse_csv_bool(value, *, default=False):
+    raw = str(value or "").strip().lower()
+    if raw in {"1", "true", "yes", "y"}:
+        return True
+    if raw in {"0", "false", "no", "n"}:
+        return False
+    return default
+
+
+def _parse_csv_mood_tags(value):
+    if isinstance(value, list):
+        raw_values = value
+    else:
+        raw = str(value or "").strip()
+        if not raw:
+            return []
+        separator = "|" if "|" in raw else ","
+        raw_values = raw.split(separator)
+
+    parsed = []
+    seen = set()
+    for token in raw_values:
+        normalized = _normalize_mood_level(token)
+        if normalized in GenerationRequest.Mood.values and normalized not in seen:
+            parsed.append(normalized)
+            seen.add(normalized)
+    return parsed
+
+
+def _record_admin_audit(action, admin_user, *, target="", metadata=None):
+    AdminAuditLog.objects.create(
+        admin_user=admin_user,
+        action=action,
+        target=target,
+        metadata=metadata or {},
+    )
+
+
+class AdminActivityCSVImportView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAdminUser]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response(
+                {"file": ["Upload a CSV file using the `file` field."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            content = uploaded_file.read().decode("utf-8-sig")
+        except UnicodeDecodeError:
+            return Response(
+                {"file": ["CSV must be UTF-8 encoded."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reader = csv.DictReader(io.StringIO(content))
+        if not reader.fieldnames:
+            return Response(
+                {"file": ["CSV header row is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        required_columns = {
+            "title",
+            "category",
+            "min_time_minutes",
+            "max_time_minutes",
+            "min_budget",
+            "max_budget",
+        }
+        missing_columns = sorted(required_columns - set(reader.fieldnames))
+        if missing_columns:
+            return Response(
+                {
+                    "file": [
+                        f"Missing required columns: {', '.join(missing_columns)}"
+                    ]
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        created = 0
+        errors = []
+
+        for row_index, row in enumerate(reader, start=2):
+            payload = {
+                "title": str(row.get("title", "")).strip(),
+                "description": str(row.get("description", "")).strip(),
+                "category": str(row.get("category", "")).strip().upper(),
+                "min_time_minutes": row.get("min_time_minutes"),
+                "max_time_minutes": row.get("max_time_minutes"),
+                "min_budget": row.get("min_budget"),
+                "max_budget": row.get("max_budget"),
+                "mood_tags": _parse_csv_mood_tags(row.get("mood_tags")),
+                "social_type": (
+                    str(row.get("social_type", Activity.SocialType.EITHER))
+                    .strip()
+                    .upper()
+                ),
+                "is_outdoor": _parse_csv_bool(row.get("is_outdoor")),
+                "is_active": _parse_csv_bool(row.get("is_active"), default=True),
+            }
+            serializer = ActivitySerializer(data=payload)
+
+            if serializer.is_valid():
+                serializer.save()
+                created += 1
+            else:
+                errors.append(
+                    {
+                        "row": row_index,
+                        "errors": serializer.errors,
+                    }
+                )
+
+        response_payload = {
+            "created": created,
+            "failed": len(errors),
+            "errors": errors[:50],
+        }
+        _record_admin_audit(
+            AdminAuditLog.Action.IMPORT_CSV,
+            request.user,
+            target=f"file:{uploaded_file.name}",
+            metadata={
+                "created": created,
+                "failed": len(errors),
+                "rows_processed": created + len(errors),
+            },
+        )
+        response_status = (
+            status.HTTP_201_CREATED
+            if not errors
+            else status.HTTP_200_OK
+        )
+        return Response(response_payload, status=response_status)
+
+
 class AdminActivityListCreateView(generics.ListCreateAPIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAdminUser]
@@ -437,8 +805,32 @@ class AdminActivityListCreateView(generics.ListCreateAPIView):
     queryset = Activity.objects.all().order_by("title")
 
 
-class AdminActivityDetailView(generics.RetrieveUpdateAPIView):
+class AdminActivityDetailView(generics.RetrieveUpdateDestroyAPIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAdminUser]
     serializer_class = ActivitySerializer
     queryset = Activity.objects.all()
+
+    def destroy(self, request, *args, **kwargs):
+        activity = self.get_object()
+        metadata = {
+            "activity_id": activity.id,
+            "title": activity.title,
+            "category": activity.category,
+        }
+        response = super().destroy(request, *args, **kwargs)
+        _record_admin_audit(
+            AdminAuditLog.Action.DELETE_ACTIVITY,
+            request.user,
+            target=f"activity:{metadata['activity_id']}",
+            metadata=metadata,
+        )
+        return response
+
+
+class AdminAuditLogListView(generics.ListAPIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [permissions.IsAdminUser]
+    serializer_class = AdminAuditLogSerializer
+    pagination_class = AdminAuditLogPagination
+    queryset = AdminAuditLog.objects.select_related("admin_user").all()

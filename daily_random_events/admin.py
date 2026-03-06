@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import Activity, ActivityLog, GenerationRequest, Suggestion
+from .models import (
+    Activity,
+    ActivityLog,
+    AdminAuditLog,
+    GenerationRequest,
+    Suggestion,
+)
 
 
 @admin.register(Activity)
@@ -29,3 +35,10 @@ class ActivityLogAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "status", "rating", "created_at")
     list_filter = ("status", "created_at")
     search_fields = ("user__username", "comment", "suggestion__activity__title")
+
+
+@admin.register(AdminAuditLog)
+class AdminAuditLogAdmin(admin.ModelAdmin):
+    list_display = ("id", "action", "admin_user", "target", "created_at")
+    list_filter = ("action", "created_at")
+    search_fields = ("admin_user__username", "target")

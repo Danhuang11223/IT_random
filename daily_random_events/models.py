@@ -168,3 +168,61 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f"Log #{self.pk} ({self.status})"
+
+
+class SavedSuggestion(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="saved_suggestions",
+    )
+    suggestion = models.ForeignKey(
+        Suggestion,
+        on_delete=models.CASCADE,
+        related_name="saved_entries",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["user", "suggestion"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "suggestion"],
+                name="saved_suggestion_user_unique",
+            )
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"SavedSuggestion #{self.pk} by user {self.user_id}"
+
+
+class AdminAuditLog(models.Model):
+    class Action(models.TextChoices):
+        IMPORT_CSV = "IMPORT_CSV", "Import CSV"
+        DELETE_ACTIVITY = "DELETE_ACTIVITY", "Delete Activity"
+
+    admin_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="admin_audit_logs",
+        null=True,
+        blank=True,
+    )
+    action = models.CharField(max_length=40, choices=Action.choices, db_index=True)
+    target = models.CharField(max_length=120, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["admin_user", "created_at"]),
+            models.Index(fields=["action", "created_at"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.action} by {self.admin_user_id or 'system'}"

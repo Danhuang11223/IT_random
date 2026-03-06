@@ -1,8 +1,15 @@
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 
-from .models import Activity, ActivityLog, GenerationRequest, Suggestion
+from .models import (
+    Activity,
+    ActivityLog,
+    AdminAuditLog,
+    GenerationRequest,
+    SavedSuggestion,
+    Suggestion,
+)
 
 User = get_user_model()
 
@@ -10,7 +17,7 @@ User = get_user_model()
 class UserSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "username", "email")
+        fields = ("id", "username", "email", "is_staff")
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -191,4 +198,67 @@ class ActivityLogSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "activity",
+        )
+
+
+class SavedSuggestionCreateSerializer(serializers.ModelSerializer):
+    suggestion_id = serializers.PrimaryKeyRelatedField(
+        queryset=Suggestion.objects.select_related("request").all(),
+        source="suggestion",
+        write_only=True,
+    )
+
+    class Meta:
+        model = SavedSuggestion
+        fields = ("suggestion_id",)
+
+    def validate(self, attrs):
+        request = self.context["request"]
+        suggestion = attrs["suggestion"]
+
+        if suggestion.request.user_id != request.user.id:
+            raise PermissionDenied("You can only save your own suggestions.")
+
+        if SavedSuggestion.objects.filter(user=request.user, suggestion=suggestion).exists():
+            raise serializers.ValidationError(
+                {"suggestion_id": "This suggestion is already saved."}
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        return SavedSuggestion.objects.create(user=request.user, **validated_data)
+
+
+class SavedSuggestionSerializer(serializers.ModelSerializer):
+    suggestion_id = serializers.IntegerField(read_only=True)
+    request_id = serializers.IntegerField(source="suggestion.request_id", read_only=True)
+    activity = ActivitySerializer(source="suggestion.activity", read_only=True)
+    is_accepted = serializers.BooleanField(source="suggestion.is_accepted", read_only=True)
+
+    class Meta:
+        model = SavedSuggestion
+        fields = (
+            "id",
+            "created_at",
+            "suggestion_id",
+            "request_id",
+            "is_accepted",
+            "activity",
+        )
+
+
+class AdminAuditLogSerializer(serializers.ModelSerializer):
+    admin_username = serializers.CharField(source="admin_user.username", read_only=True)
+
+    class Meta:
+        model = AdminAuditLog
+        fields = (
+            "id",
+            "action",
+            "admin_username",
+            "target",
+            "metadata",
+            "created_at",
         )

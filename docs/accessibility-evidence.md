@@ -7,6 +7,7 @@ This page identifies concrete accessibility improvements already implemented in 
 - Sign in page
 - Generator form
 - Activity history actions
+- Dashboard header accessibility panel
 
 ## Improvement 1: Explicit labels and inline validation feedback
 
@@ -43,23 +44,27 @@ This improves form clarity, helps keyboard and screen-magnifier users understand
 
 The controls are reachable via keyboard, have clearer semantics, and communicate their purpose to assistive technologies better than unstructured clickable content.
 
-## Improvement 3: Visible focus states and disabled-state feedback
+## Improvement 3: User-controlled accessibility preferences with persistence
 
 **What was improved**
 
-- Focused inputs and textareas receive a visible outline and shadow.
-- Disabled buttons and controls use clear disabled styling.
-- Busy states prevent accidental double submissions.
+- Added an Accessibility panel in the dashboard header with semantic switch controls.
+- Users can toggle:
+  - Reduce motion
+  - Larger text
+  - High contrast
+- Preferences are persisted in localStorage and re-applied on reload.
+- Body classes are applied globally so the settings affect all pages consistently.
 
 **Evidence in code**
 
-- Focus styles: [style.css](/Users/danhuang/Desktop/Random/frontend/src/style.css#L412)
-- Disabled button styles: [style.css](/Users/danhuang/Desktop/Random/frontend/src/style.css#L543)
-- Pagination disabled styles: [style.css](/Users/danhuang/Desktop/Random/frontend/src/style.css#L617)
+- Accessibility panel switches (`role="switch"` + `aria-checked`): [DashboardLayout.vue](/Users/danhuang/Desktop/Random/frontend/src/layouts/DashboardLayout.vue)
+- Preference state + localStorage persistence: [state.js](/Users/danhuang/Desktop/Random/frontend/src/state.js)
+- Global preference classes (`pref-reduce-motion`, `pref-large-text`, `pref-high-contrast`): [style.css](/Users/danhuang/Desktop/Random/frontend/src/style.css)
 
 **Why it matters**
 
-Visible focus indicators support keyboard navigation, and disabled-state feedback prevents confusing repeat actions during loading.
+This gives users direct control over motion, readability, and contrast needs, and keeps the chosen settings stable across sessions.
 
 ## Suggested Screenshots for the Report
 

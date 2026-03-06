@@ -45,12 +45,20 @@ If any diagrams are unchanged from the design submission, state that explicitly 
   - `GenerationRequest`
   - `Suggestion`
   - `ActivityLog`
+  - `SavedSuggestion`
 - The recommendation pipeline:
   1. Hard-filter on time, budget, and excluded categories.
   2. Score surviving activities using energy and social preference.
   3. Sort by score and budget fit.
   4. Randomly choose from the top-ranked candidates.
   5. If hard filters return no results, relax excluded categories once.
+  6. Exclude activities shown in the last 7 days for the same user.
+  7. If cooldown exclusion empties candidates, relax cooldown once and return a notice flag.
+- API extensions added:
+  - `GET/POST /api/saved/`
+  - `DELETE /api/saved/{id}/`
+  - `GET /api/logs/` now supports `q` and `sort`
+  - Generate/reroll responses now include `cooldown_relaxed` and `cooldown_message`
 
 ### Front end
 
@@ -60,8 +68,22 @@ If any diagrams are unchanged from the design submission, state that explicitly 
   - Create account
   - Generator
   - Activity History
+  - Saved for Later
 - Uses asynchronous API requests via Axios.
 - Includes dynamic client-side validation, loading states, pagination, filter controls, and reactive state updates.
+- Includes a reusable calendar modal that supports `.ics` export and Google Calendar deep-linking.
+- Includes structured recommendation explainability in the result card:
+  - hard constraints (time/budget/excluded category)
+  - soft preference score (energy/social)
+  - system fallbacks (category relaxation/cooldown relaxation)
+- Includes an accessibility settings panel in the dashboard header:
+  - Reduce motion
+  - Larger text
+  - High contrast
+  with localStorage persistence.
+- History and saved pages support search/sort/pagination with URL query synchronization.
+- Includes 5-second undo for delete actions in Saved and Activity History.
+- Includes an admin maintenance page for activity pool CRUD and CSV import.
 
 ### Core functionality delivered
 
@@ -70,6 +92,12 @@ If any diagrams are unchanged from the design submission, state that explicitly 
 - Suggestion acceptance
 - Activity history with completed/skipped states
 - Delete history entries
+- Save-for-later flow independent from accept
+- Add to calendar from generator/history/saved cards
+- Non-repeat recommendation guard (7 days) with one-time relaxation fallback
+- Explainability block for each generated suggestion
+- Admin activity pool CRUD + CSV import
+- Delete undo (saved/history)
 - Database-backed seed activity pool
 
 ### Look and feel
@@ -106,6 +134,15 @@ npm run build
 ```
 
 This verifies the production build completes successfully.
+
+Automated E2E scenario is provided with Playwright:
+
+```bash
+cd frontend
+npm run e2e
+```
+
+Covered path: login -> generate -> save -> history search/sort.
 
 Add one screenshot of successful test output and one screenshot of the built front-end flow.
 

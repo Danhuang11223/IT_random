@@ -4,13 +4,17 @@ from .views import (
     ActivityLogDetailView,
     AcceptSuggestionView,
     ActivityLogListCreateView,
+    AdminAuditLogListView,
     AdminActivityDetailView,
+    AdminActivityCSVImportView,
     AdminActivityListCreateView,
     GenerateView,
     LoginView,
     MetadataView,
     RegisterView,
     RerollView,
+    SavedSuggestionDetailView,
+    SavedSuggestionListCreateView,
 )
 
 app_name = "daily_random_events"
@@ -28,6 +32,12 @@ urlpatterns = [
     ),
     path("logs/", ActivityLogListCreateView.as_view(), name="activity-logs"),
     path("logs/<int:log_id>/", ActivityLogDetailView.as_view(), name="activity-log-detail"),
+    path("saved/", SavedSuggestionListCreateView.as_view(), name="saved-suggestions"),
+    path(
+        "saved/<int:saved_id>/",
+        SavedSuggestionDetailView.as_view(),
+        name="saved-suggestion-detail",
+    ),
     path(
         "admin/activities/",
         AdminActivityListCreateView.as_view(),
@@ -37,5 +47,15 @@ urlpatterns = [
         "admin/activities/<int:pk>/",
         AdminActivityDetailView.as_view(),
         name="admin-activity-detail",
+    ),
+    path(
+        "admin/activities/import-csv/",
+        AdminActivityCSVImportView.as_view(),
+        name="admin-activity-import-csv",
+    ),
+    path(
+        "admin/audit-logs/",
+        AdminAuditLogListView.as_view(),
+        name="admin-audit-log-list",
     ),
 ]

@@ -41,6 +41,13 @@ except ImportError:
 else:
     HAS_WHITENOISE = True
 
+try:
+    import corsheaders  # noqa: F401
+except ImportError:
+    HAS_CORSHEADERS = False
+else:
+    HAS_CORSHEADERS = True
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv(
@@ -49,13 +56,19 @@ SECRET_KEY = os.getenv(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env_flag("DJANGO_DEBUG", True)
+DEBUG = env_flag("DJANGO_DEBUG", False)
 
 ALLOWED_HOSTS = env_list(
     "DJANGO_ALLOWED_HOSTS",
     "127.0.0.1,localhost,testserver",
 )
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "")
+CORS_ALLOWED_ORIGINS = env_list(
+    "DJANGO_CORS_ALLOWED_ORIGINS",
+    "http://127.0.0.1:5173,http://localhost:5173",
+)
+CORS_ALLOWED_ORIGIN_REGEXES = env_list("DJANGO_CORS_ALLOWED_ORIGIN_REGEXES", "")
+CORS_ALLOW_ALL_ORIGINS = env_flag("DJANGO_CORS_ALLOW_ALL", False)
 
 
 # Application definition
@@ -72,6 +85,9 @@ INSTALLED_APPS = [
     'daily_random_events.apps.DailyRandomEventsConfig',
 ]
 
+if HAS_CORSHEADERS:
+    INSTALLED_APPS.append('corsheaders')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -81,6 +97,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+if HAS_CORSHEADERS:
+    MIDDLEWARE.insert(1, 'corsheaders.middleware.CorsMiddleware')
 
 if not DEBUG and HAS_WHITENOISE:
     MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
