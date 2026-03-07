@@ -883,7 +883,8 @@ class DailyRandomEventsAPITests(APITestCase):
 
         allowed_response = admin_client.get("/api/admin/activities/")
         self.assertEqual(allowed_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(allowed_response.data), Activity.objects.count())
+        self.assertEqual(allowed_response.data["count"], Activity.objects.count())
+        self.assertLessEqual(len(allowed_response.data["results"]), 4)
 
     def test_admin_can_delete_and_import_activities_via_csv(self):
         admin_client = self._auth_client(self.admin_user)
