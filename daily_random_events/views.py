@@ -337,6 +337,14 @@ class LoginView(APIView):
         )
 
 
+class HealthView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, _request):
+        return Response({"status": "ok"})
+
+
 class MetadataView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAuthenticated]
