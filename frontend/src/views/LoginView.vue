@@ -9,7 +9,7 @@ import LoginPanel from "../components/LoginPanel.vue";
     <LoginPanel />
     <p class="auth-inline-row">
       No account yet?
-      <RouterLink class="auth-inline-link" to="/register">Create account</RouterLink>
+      <RouterLink class="auth-inline-link" to="/register">Sign up</RouterLink>
     </p>
   </main>
 </template>

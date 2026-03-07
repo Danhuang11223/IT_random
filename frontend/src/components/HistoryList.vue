@@ -3,7 +3,6 @@ import { computed, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 
 import { getCategoryOption } from "../categoryOptions";
-import CalendarModal from "./CalendarModal.vue";
 import {
   changeHistoryFilter,
   changeHistoryQuery,
@@ -21,8 +20,6 @@ const actionButtonsDisabled = computed(
   () => state.busy.history || state.busy.log || state.busy.deleteLog
 );
 const localQuery = ref(state.historyQuery);
-const selectedCalendarActivity = ref(null);
-const calendarOpen = ref(false);
 const ratingOptions = [1, 2, 3, 4, 5];
 const filters = [
   { label: "All", value: "ALL" },
@@ -102,9 +99,21 @@ async function handleSortChange(event) {
   }
 }
 
-function openCalendar(activity) {
-  selectedCalendarActivity.value = activity;
-  calendarOpen.value = true;
+function normalizeMoney(value) {
+  return Math.round(Number(value || 0));
+}
+
+function formatBudgetRange(activity) {
+  const minBudget = normalizeMoney(activity?.min_budget);
+  const maxBudget = normalizeMoney(activity?.max_budget);
+
+  if (minBudget === 0 && maxBudget === 0) {
+    return "Free";
+  }
+  if (minBudget === maxBudget) {
+    return `£${maxBudget}`;
+  }
+  return `£${minBudget} - £${maxBudget}`;
 }
 
 function setRating(value) {
@@ -117,6 +126,22 @@ function clearRating() {
 
 function isRatingActive(value) {
   return Number(state.completionForm.rating || 0) === value;
+}
+
+function formatDateOnly(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value).split("T")[0] || "-";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}/${month}/${day}`;
 }
 </script>
 
@@ -132,9 +157,15 @@ function isRatingActive(value) {
         <strong>{{ pendingSuggestion.activity.title }}</strong>
         <span class="status-pill pending">Pending</span>
       </div>
-      <p class="history-meta">
-        {{ getCategoryOption(pendingSuggestion.activity.category).label }} · Accepted · waiting to be logged
-      </p>
+      <div class="record-tag-row">
+        <span class="record-tag">{{ getCategoryOption(pendingSuggestion.activity.category).label }}</span>
+        <span class="record-tag">
+          ⏱ {{ pendingSuggestion.activity.min_time_minutes }}-{{ pendingSuggestion.activity.max_time_minutes }} min
+        </span>
+        <span class="record-tag">💰 {{ formatBudgetRange(pendingSuggestion.activity) }}</span>
+        <span class="record-tag">📅 {{ formatDateOnly(pendingSuggestion.created_at) }}</span>
+      </div>
+      <p class="history-meta">Accepted and waiting to be logged.</p>
       <p class="pending-card-copy">
         {{ pendingSuggestion.activity.description }}
       </p>
@@ -145,7 +176,7 @@ function isRatingActive(value) {
         </p>
 
         <label class="field">
-          <span>Rating (optional)</span>
+          <span>Your rating (optional)</span>
           <div class="rating-stars">
             <button
               v-for="rating in ratingOptions"
@@ -182,14 +213,6 @@ function isRatingActive(value) {
 
         <div class="button-row">
           <button
-            class="ghost-button"
-            :disabled="actionButtonsDisabled"
-            @click="openCalendar(pendingSuggestion.activity)"
-          >
-            Add to Calendar
-          </button>
-
-          <button
             class="primary-button"
             :disabled="actionButtonsDisabled"
             @click="handleComplete"
@@ -202,7 +225,7 @@ function isRatingActive(value) {
             :disabled="actionButtonsDisabled"
             @click="handleSkip"
           >
-            Mark as skipped
+            Skip
           </button>
 
           <button
@@ -210,7 +233,7 @@ function isRatingActive(value) {
             :disabled="actionButtonsDisabled"
             @click="handleDelete(pendingSuggestion)"
           >
-            {{ state.busy.deleteLog ? "Deleting..." : "Delete pending" }}
+            {{ state.busy.deleteLog ? "Deleting..." : "Delete" }}
           </button>
         </div>
       </div>
@@ -286,15 +309,16 @@ function isRatingActive(value) {
             </button>
           </div>
         </div>
-        <p class="history-meta">
-          {{ getCategoryOption(item.activity.category).label }} · Rating {{ item.rating ?? "-" }}
-        </p>
-        <p v-if="item.comment" class="history-comment">{{ item.comment }}</p>
-        <div class="button-row">
-          <button class="ghost-button small-button" @click="openCalendar(item.activity)">
-            Add to Calendar
-          </button>
+        <div class="record-tag-row">
+          <span class="record-tag">{{ getCategoryOption(item.activity.category).label }}</span>
+          <span class="record-tag">
+            ⏱ {{ item.activity.min_time_minutes }}-{{ item.activity.max_time_minutes }} min
+          </span>
+          <span class="record-tag">💰 {{ formatBudgetRange(item.activity) }}</span>
+          <span class="record-tag">⭐ {{ item.rating ?? "-" }}</span>
+          <span class="record-tag">📅 {{ formatDateOnly(item.updated_at || item.created_at) }}</span>
         </div>
+        <p v-if="item.comment" class="history-comment">{{ item.comment }}</p>
       </li>
     </ul>
 
@@ -362,9 +386,5 @@ function isRatingActive(value) {
       </RouterLink>
     </div>
 
-    <CalendarModal
-      v-model="calendarOpen"
-      :activity="selectedCalendarActivity"
-    />
   </section>
 </template>

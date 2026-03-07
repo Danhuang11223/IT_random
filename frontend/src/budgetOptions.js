@@ -1,7 +1,7 @@
 const BUDGET_OPTIONS = [
   {
     value: "FREE",
-    label: "Free (£0)",
+    label: "Free",
     maxBudget: 0,
   },
   {
@@ -21,7 +21,7 @@ const BUDGET_OPTIONS = [
   },
   {
     value: "ANY",
-    label: "Any budget",
+    label: "No preference",
     maxBudget: 100000,
   },
 ];

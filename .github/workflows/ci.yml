@@ -75,6 +75,9 @@ jobs:
 
       - name: Run Playwright e2e
         working-directory: frontend
+        env:
+          PLAYWRIGHT_BACKEND_PYTHON: python
+          DJANGO_DEBUG: "1"
         run: npm run e2e
 
       - name: Upload Playwright report

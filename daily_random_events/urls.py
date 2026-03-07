@@ -9,6 +9,7 @@ from .views import (
     AdminActivityCSVImportView,
     AdminActivityListCreateView,
     GenerateView,
+    HealthView,
     LoginView,
     MetadataView,
     RegisterView,
@@ -20,6 +21,7 @@ from .views import (
 app_name = "daily_random_events"
 
 urlpatterns = [
+    path("health/", HealthView.as_view(), name="health"),
     path("auth/register/", RegisterView.as_view(), name="register"),
     path("auth/login/", LoginView.as_view(), name="login"),
     path("metadata/", MetadataView.as_view(), name="metadata"),

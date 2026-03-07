@@ -2,12 +2,13 @@
 import { reactive, watch } from "vue";
 import { useRouter } from "vue-router";
 
+import diceIcon from "../assets/auth/roll-dice.gif";
 import { loginWithPassword, state } from "../state";
 
 const router = useRouter();
 const form = reactive({
-  username: "admin",
-  password: "Admin123456!",
+  username: "",
+  password: "",
 });
 
 watch(
@@ -66,8 +67,15 @@ async function submit() {
         </small>
       </label>
 
-      <button class="primary-button" :disabled="state.busy.auth">
-        {{ state.busy.auth ? "Signing in..." : "Sign in" }}
+      <button class="primary-button roll-day-button" :disabled="state.busy.auth">
+        <span class="roll-day-content">
+          <img
+            :src="diceIcon"
+            alt=""
+            class="roll-day-dice"
+          />
+          <span>{{ state.busy.auth ? "Rolling..." : "Roll my day" }}</span>
+        </span>
       </button>
     </form>
   </section>

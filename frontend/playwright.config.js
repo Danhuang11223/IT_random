@@ -1,5 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
+const backendPython = process.env.PLAYWRIGHT_BACKEND_PYTHON || "python";
+
 export default defineConfig({
   testDir: "./e2e",
   timeout: 60_000,
@@ -12,8 +14,8 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "../.venv/bin/python ../manage.py runserver 127.0.0.1:8000 --noreload",
-      url: "http://127.0.0.1:8000/api/metadata/",
+      command: `${backendPython} ../manage.py runserver 127.0.0.1:8000 --noreload`,
+      url: "http://127.0.0.1:8000/api/health/",
       reuseExistingServer: true,
       timeout: 120_000,
     },
