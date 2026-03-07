@@ -27,6 +27,8 @@ import { getBudgetCap } from "./budgetOptions";
 
 const UI_PREFS_KEY = "daily-random-events-ui-prefs";
 const HISTORY_SORTS = new Set(["newest", "oldest", "title"]);
+const HISTORY_PAGE_SIZE = 4;
+const SAVED_PAGE_SIZE = 4;
 let undoAction = null;
 let undoTimerId = null;
 
@@ -134,11 +136,11 @@ export const state = reactive({
   historyFilter: "ALL",
   historyQuery: "",
   historySort: "newest",
-  pagination: initialPagination(10),
+  pagination: initialPagination(HISTORY_PAGE_SIZE),
   savedItems: [],
   savedQuery: "",
   savedSort: "newest",
-  savedPagination: initialPagination(10),
+  savedPagination: initialPagination(SAVED_PAGE_SIZE),
   adminAuditLogs: [],
   adminAuditPagination: initialPagination(20),
   uiPrefs: initialUiPrefs,
@@ -454,11 +456,11 @@ function resetSessionData() {
   state.historyFilter = "ALL";
   state.historyQuery = "";
   state.historySort = "newest";
-  state.pagination = initialPagination(10);
+  state.pagination = initialPagination(HISTORY_PAGE_SIZE);
   state.savedItems = [];
   state.savedQuery = "";
   state.savedSort = "newest";
-  state.savedPagination = initialPagination(10);
+  state.savedPagination = initialPagination(SAVED_PAGE_SIZE);
   state.adminAuditLogs = [];
   state.adminAuditPagination = initialPagination(20);
   clearFormErrors();
@@ -521,7 +523,7 @@ function syncDefaults() {
 }
 
 function updateHistory(logs) {
-  const pageSize = state.pagination.page_size || 10;
+  const pageSize = HISTORY_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil((logs.count || 0) / pageSize));
   const page = Math.min(
     totalPages,
@@ -541,7 +543,7 @@ function updateHistory(logs) {
 }
 
 function updateSaved(saved) {
-  const pageSize = state.savedPagination.page_size || 10;
+  const pageSize = SAVED_PAGE_SIZE;
   const totalPages = Math.max(1, Math.ceil((saved.count || 0) / pageSize));
   const page = Math.min(
     totalPages,
@@ -1224,18 +1226,19 @@ export async function undoLastDelete() {
   }
 }
 
-export async function loadAdminActivitiesList() {
+export async function loadAdminActivitiesList(page = 1) {
+  const targetPage = Math.max(1, Number(page || 1));
   state.busy.admin = true;
   clearFormErrors("admin");
   try {
-    const result = await fetchAdminActivities();
+    const result = await fetchAdminActivities(targetPage);
     state.error = "";
     clearRetry();
     return result;
   } catch (err) {
     setRequestError(err, {
       fieldScope: "admin",
-      retryAction: () => loadAdminActivitiesList(),
+      retryAction: () => loadAdminActivitiesList(targetPage),
       retryLabel: "Retry loading admin activities",
     });
     throw err;

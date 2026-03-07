@@ -114,8 +114,10 @@ export async function deleteSaved(savedId) {
   await api.delete(`/saved/${savedId}/`);
 }
 
-export async function fetchAdminActivities() {
-  const response = await api.get("/admin/activities/");
+export async function fetchAdminActivities(page = 1) {
+  const response = await api.get("/admin/activities/", {
+    params: { page },
+  });
   return response.data;
 }
 

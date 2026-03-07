@@ -179,14 +179,15 @@ async function handleUseThisIdea(item) {
           </div>
         </div>
 
-        <p class="history-meta">
-          {{ getCategoryOption(item.activity.category).label }} · {{ formatSavedDate(item.created_at) }}
-        </p>
+        <div class="record-tag-row">
+          <span class="record-tag">{{ getCategoryOption(item.activity.category).label }}</span>
+          <span class="record-tag">
+            ⏱ {{ item.activity.min_time_minutes }}-{{ item.activity.max_time_minutes }} min
+          </span>
+          <span class="record-tag">💰 {{ formatBudgetRange(item.activity) }}</span>
+          <span class="record-tag">🕒 {{ formatSavedDate(item.created_at) }}</span>
+        </div>
         <p class="history-comment">{{ item.activity.description }}</p>
-        <p class="history-meta">
-          {{ item.activity.min_time_minutes }} - {{ item.activity.max_time_minutes }} min ·
-          {{ formatBudgetRange(item.activity) }}
-        </p>
 
         <div class="button-row">
           <button class="ghost-button small-button" @click="openCalendar(item.activity)">
