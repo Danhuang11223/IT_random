@@ -19,7 +19,9 @@ test("login -> generate -> save -> history search/sort", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Your suggestion/i })).toBeVisible();
 
   await page.getByRole("button", { name: /💾 Save|Save/i }).click();
-  await expect(page.getByText("Saved for later.")).toBeVisible();
+  await page.getByRole("link", { name: "Saved" }).click();
+  await expect(page).toHaveURL(/\/saved/);
+  await expect(page.locator(".history-item").first()).toBeVisible();
 
   await page.getByRole("link", { name: "Activity History" }).click();
   await expect(page).toHaveURL(/\/history/);
