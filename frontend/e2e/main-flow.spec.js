@@ -5,20 +5,18 @@ test("login -> generate -> save -> history search/sort", async ({ page }) => {
 
   await page.getByLabel("Username").fill("admin");
   await page.getByLabel("Password").fill("Admin123456!");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: /Roll my day|Sign in/i }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole("heading", { name: "Your Suggestion" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Let's pick something fun/i })).toBeVisible();
 
   await page.getByRole("button", { name: /Just right/i }).click();
+  await page.getByRole("button", { name: /^30 min$/i }).click();
+  await page.getByRole("button", { name: /Medium/i }).click();
   await page.getByRole("button", { name: /Just me/i }).click();
-  await page.getByRole("button", { name: /30 min/i }).click();
-  await page.getByRole("button", { name: /Medium \(£15-£50\)/i }).click();
   await page.getByRole("button", { name: /Surprise me/i }).click();
 
-  await expect(
-    page.locator(".result-card h3")
-  ).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: /Your suggestion/i })).toBeVisible();
 
   await page.getByRole("button", { name: /💾 Save|Save/i }).click();
   await expect(page.getByText("Saved for later.")).toBeVisible();

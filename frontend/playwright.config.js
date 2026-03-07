@@ -15,7 +15,7 @@ export default defineConfig({
   webServer: [
     {
       command: `${backendPython} ../manage.py runserver 127.0.0.1:8000 --noreload`,
-      url: "http://127.0.0.1:8000/api/metadata/",
+      url: "http://127.0.0.1:8000/admin/login/",
       reuseExistingServer: true,
       timeout: 120_000,
     },
