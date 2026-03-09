@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
-
+import ForgotPasswordView from "./views/ForgotPasswordView.vue";
+// 👇 1. 引入新页面 👇
+import ResetPasswordConfirmView from "./views/ResetPasswordConfirmView.vue";
 import { getStoredToken } from "./api";
 import AuthLayout from "./layouts/AuthLayout.vue";
 import DashboardLayout from "./layouts/DashboardLayout.vue";
@@ -28,6 +30,17 @@ const routes = [
         path: "register",
         name: "register",
         component: RegisterView,
+      },
+      {
+        path: "forgot-password",
+        name: "forgotPassword",
+        component: ForgotPasswordView,
+      },
+      // 👇 2. 新增带参数的重置密码确认路由 👇
+      {
+        path: "reset-password-confirm/:uid/:token",
+        name: "resetPasswordConfirm",
+        component: ResetPasswordConfirmView,
       },
     ],
   },

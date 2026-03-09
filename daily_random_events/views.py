@@ -14,6 +14,11 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_decode
+from django.utils.encoding import force_str
 
 from .models import (
     Activity,
@@ -843,3 +848,64 @@ class AdminAuditLogListView(generics.ListAPIView):
     serializer_class = AdminAuditLogSerializer
     pagination_class = AdminAuditLogPagination
     queryset = AdminAuditLog.objects.select_related("admin_user").all()
+
+class PasswordResetDemoView(APIView):
+
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response(
+                {'error': 'Please provide an email address.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user = User.objects.filter(email=email).first()
+        
+        if user:
+        
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            
+            
+            reset_link = f"http://localhost:5173/reset-password-confirm/{uid}/{token}"
+            
+        
+            return Response({
+                'message': 'Success',
+                'demo_link': reset_link
+            }, status=status.HTTP_200_OK)
+
+        return Response(
+            {'error': 'No user found with this email.'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+class PasswordResetConfirmView(APIView):
+    
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        uidb64 = request.data.get('uid')
+        token = request.data.get('token')
+        new_password = request.data.get('new_password')
+
+        if not all([uidb64, token, new_password]):
+            return Response({'error': 'Missing data.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+        
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+
+    
+        if user is not None and default_token_generator.check_token(user, token):
+            user.set_password(new_password)
+            user.save()
+            return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
+        
+        return Response({'error': 'Invalid or expired link.'}, status=status.HTTP_400_BAD_REQUEST)

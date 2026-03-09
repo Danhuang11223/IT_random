@@ -23,8 +23,9 @@ const wizardSteps = [
   { key: "time", label: "Time" },
   { key: "budget", label: "Budget" },
   { key: "social", label: "Social" },
-  { key: "surprise", label: "Surprise" },
-  { key: "result", label: "Result" },
+  { key: "summary", label: "Summary" }, 
+  { key: "roll", label: "Roll" },       
+  { key: "result", label: "Result" },   
 ];
 
 const STEP_INDEX = {
@@ -32,8 +33,9 @@ const STEP_INDEX = {
   time: 1,
   budget: 2,
   social: 3,
-  surprise: 4,
-  result: 5,
+  summary: 4,
+  roll: 5,
+  result: 6,
 };
 
 const quickTimeChoices = [5, 15, 30, 60];
@@ -89,19 +91,14 @@ function isQuickTimeActive(minutes) {
 }
 
 function setWizardStep(index, direction = "forward") {
-  if (index < 0 || index >= wizardSteps.length) {
-    return;
-  }
+  if (index < 0 || index >= wizardSteps.length) return;
   wizardDirection.value = direction;
   wizardStepIndex.value = index;
   wizardError.value = "";
 }
 
 function jumpToStep(index) {
-  if (index === wizardStepIndex.value) {
-    return;
-  }
-
+  if (index === wizardStepIndex.value) return;
   setWizardStep(index, index > wizardStepIndex.value ? "forward" : "backward");
 }
 
@@ -109,11 +106,18 @@ function goPreviousStep() {
   setWizardStep(wizardStepIndex.value - 1, "backward");
 }
 
-function handleSwipeLeft() {
+function goNextStep() {
   const stepKey = currentWizardStep.value.key;
-  if (!["mood", "time", "budget", "social"].includes(stepKey)) {
+  if (!isStepReady(stepKey)) {
+    wizardError.value = stepErrorMessage(stepKey);
     return;
   }
+  setWizardStep(wizardStepIndex.value + 1, "forward");
+}
+
+function handleSwipeLeft() {
+  const stepKey = currentWizardStep.value.key;
+  if (!["mood", "time", "budget", "social", "summary"].includes(stepKey)) return;
   if (!isStepReady(stepKey)) {
     wizardError.value = stepErrorMessage(stepKey);
     return;
@@ -123,12 +127,10 @@ function handleSwipeLeft() {
 
 function handleSwipeRight() {
   if (currentWizardStep.value.key === "result") {
-    setWizardStep(STEP_INDEX.surprise, "backward");
+    setWizardStep(STEP_INDEX.roll, "backward");
     return;
   }
-  if (wizardStepIndex.value > 0) {
-    goPreviousStep();
-  }
+  if (wizardStepIndex.value > 0) goPreviousStep();
 }
 
 function handleCardTouchStart(event) {
@@ -137,11 +139,7 @@ function handleCardTouchStart(event) {
     return;
   }
   const touch = event.touches[0];
-  touchGesture.value = {
-    x: touch.clientX,
-    y: touch.clientY,
-    time: Date.now(),
-  };
+  touchGesture.value = { x: touch.clientX, y: touch.clientY, time: Date.now() };
 }
 
 function handleCardTouchEnd(event) {
@@ -155,82 +153,36 @@ function handleCardTouchEnd(event) {
   const durationMs = Date.now() - touchGesture.value.time;
   touchGesture.value = null;
 
-  if (durationMs > 700) {
-    return;
-  }
-  if (Math.abs(deltaX) < 56) {
-    return;
-  }
-  if (Math.abs(deltaX) < Math.abs(deltaY) * 1.2) {
-    return;
-  }
-  if (deltaX < 0) {
-    handleSwipeLeft();
-  } else {
-    handleSwipeRight();
-  }
+  if (durationMs > 700 || Math.abs(deltaX) < 56 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
+  deltaX < 0 ? handleSwipeLeft() : handleSwipeRight();
 }
 
 function isValidTimeSelection() {
   const rawTimeValue = String(state.constraints.time_minutes ?? "").trim();
-  if (!rawTimeValue) {
-    return false;
-  }
+  if (!rawTimeValue) return false;
   const timeValue = Number(rawTimeValue);
-  return (
-    Number.isInteger(timeValue)
-    && timeValue >= 5
-    && timeValue <= 1440
-    && timeValue % 5 === 0
-  );
+  return Number.isInteger(timeValue) && timeValue >= 5 && timeValue <= 1440 && timeValue % 5 === 0;
 }
 
 function stepErrorMessage(stepKey) {
-  if (stepKey === "mood") {
-    return "Pick one mood to continue.";
-  }
-  if (stepKey === "time") {
-    return "Choose a time value in 5-minute increments.";
-  }
-  if (stepKey === "budget") {
-    return "Pick a budget level to continue.";
-  }
-  if (stepKey === "social") {
-    return "Select who is joining.";
-  }
+  if (stepKey === "mood") return "Pick one mood to continue.";
+  if (stepKey === "time") return "Choose a time value in 5-minute increments.";
+  if (stepKey === "budget") return "Pick a budget level to continue.";
+  if (stepKey === "social") return "Select who is joining.";
   return "";
 }
 
 function isStepReady(stepKey) {
-  if (stepKey === "mood") {
-    return Boolean(state.constraints.mood);
-  }
-  if (stepKey === "time") {
-    return isValidTimeSelection();
-  }
-  if (stepKey === "budget") {
-    return Boolean(state.constraints.budget_preference);
-  }
-  if (stepKey === "social") {
-    return Boolean(state.constraints.social_preference);
-  }
+  if (stepKey === "mood") return Boolean(state.constraints.mood);
+  if (stepKey === "time") return isValidTimeSelection();
+  if (stepKey === "budget") return Boolean(state.constraints.budget_preference);
+  if (stepKey === "social") return Boolean(state.constraints.social_preference);
   return true;
-}
-
-function goNextStep() {
-  const stepKey = currentWizardStep.value.key;
-  if (!isStepReady(stepKey)) {
-    wizardError.value = stepErrorMessage(stepKey);
-    return;
-  }
-  setWizardStep(wizardStepIndex.value + 1, "forward");
 }
 
 function queueAutoAdvance(expectedStepKey) {
   window.setTimeout(() => {
-    if (currentWizardStep.value.key !== expectedStepKey) {
-      return;
-    }
+    if (currentWizardStep.value.key !== expectedStepKey) return;
     goNextStep();
   }, 160);
 }
@@ -263,77 +215,55 @@ function selectQuickTime(minutes) {
 function selectCustomTime() {
   timeMode.value = "other";
   wizardError.value = "";
-
   if (quickTimeChoices.includes(Number(state.constraints.time_minutes))) {
     state.constraints.time_minutes = "";
   }
 }
 
 function submitCustomTime() {
-  if (currentWizardStep.value.key !== "time" || timeMode.value !== "other") {
-    return;
-  }
+  if (currentWizardStep.value.key !== "time" || timeMode.value !== "other") return;
   goNextStep();
 }
 
 async function handleGenerateFromSurprise() {
-  if (state.busy.generate || isRollingDice.value) {
-    return;
-  }
-
+  if (state.busy.generate || isRollingDice.value) return;
   isRollingDice.value = true;
   try {
     await generateSuggestion();
     celebrateVisible.value = true;
-    if (celebrateTimerId) {
-      window.clearTimeout(celebrateTimerId);
-    }
+    if (celebrateTimerId) window.clearTimeout(celebrateTimerId);
     celebrateTimerId = window.setTimeout(() => {
       celebrateVisible.value = false;
       celebrateTimerId = null;
     }, 1600);
     setWizardStep(STEP_INDEX.result, "forward");
   } catch {
-    // Error state is handled in shared state.
   } finally {
     isRollingDice.value = false;
   }
 }
 
-watch(
-  () => state.constraints.time_minutes,
-  (value) => {
-    if (value === "" || value === null || value === undefined) {
-      return;
-    }
+watch(() => state.constraints.time_minutes, (value) => {
+  if (value === "" || value === null || value === undefined) return;
+  timeMode.value = quickTimeChoices.includes(Number(value)) ? "quick" : "other";
+}, { immediate: true });
 
-    timeMode.value = quickTimeChoices.includes(Number(value)) ? "quick" : "other";
-  },
-  { immediate: true }
-);
+watch(() => [
+  state.constraints.time_minutes,
+  state.constraints.budget_preference,
+  state.constraints.mood,
+  state.constraints.social_preference,
+  state.constraints.excluded_categories.join("|"),
+], () => {
+  resetGeneratedSuggestion();
+  wizardError.value = "";
+});
 
-watch(
-  () => [
-    state.constraints.time_minutes,
-    state.constraints.budget_preference,
-    state.constraints.mood,
-    state.constraints.social_preference,
-    state.constraints.excluded_categories.join("|"),
-  ],
-  () => {
-    resetGeneratedSuggestion();
-    wizardError.value = "";
+watch(() => state.suggestion, (suggestion) => {
+  if (!suggestion && wizardStepIndex.value === STEP_INDEX.result) {
+    setWizardStep(STEP_INDEX.roll, "backward");
   }
-);
-
-watch(
-  () => state.suggestion,
-  (suggestion) => {
-    if (!suggestion && wizardStepIndex.value === STEP_INDEX.result) {
-      setWizardStep(STEP_INDEX.surprise, "backward");
-    }
-  }
-);
+});
 
 onBeforeUnmount(() => {
   if (celebrateTimerId) {
@@ -383,228 +313,270 @@ onBeforeUnmount(() => {
           @touchstart.passive="handleCardTouchStart"
           @touchend.passive="handleCardTouchEnd"
         >
-        <template v-if="currentWizardStep.key === 'mood'">
-          <p class="section-kicker">1. Mood</p>
-          <h3 class="wizard-question">How are you feeling today?</h3>
-          <p class="wizard-note">Tell us the vibe.<br>We will match the activity to it.</p>
-
-          <div class="choice-chip-grid">
-            <button
-              v-for="mood in availableMoodOptions"
-              :key="mood.value"
-              type="button"
-              class="choice-chip"
-              :class="{ active: state.constraints.mood === mood.value }"
-              :aria-pressed="state.constraints.mood === mood.value"
-              @click="handleMoodSelect(mood.value)"
-            >
-              <span class="mood-copy">{{ mood.label }}</span>
-            </button>
-          </div>
-        </template>
-
-        <template v-else-if="currentWizardStep.key === 'time'">
-          <p class="section-kicker">2. Time</p>
-          <h3 class="wizard-question">How much time do you have?</h3>
-          <p class="wizard-note">Pick a quick option<br>or enter your own time.</p>
-
-          <div class="time-choice-list">
-            <button
-              v-for="minutes in quickTimeChoices"
-              :key="minutes"
-              type="button"
-              class="time-choice-chip"
-              :class="{ active: isQuickTimeActive(minutes) && timeMode === 'quick' }"
-              @click="selectQuickTime(minutes)"
-            >
-              {{ minutes }} min
-            </button>
-            <button
-              type="button"
-              class="time-choice-chip"
-              :class="{ active: timeMode === 'other' }"
-              @click="selectCustomTime"
-            >
-              Custom time
-            </button>
-          </div>
-
-          <input
-            v-if="timeMode === 'other'"
-            v-model.number="state.constraints.time_minutes"
-            type="number"
-            min="5"
-            max="1440"
-            step="5"
-            placeholder="e.g. 45"
-            class="time-other-input"
-            @keydown.enter.prevent="submitCustomTime"
-          />
-
-          <div class="wizard-nav">
-            <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
-            <button
-              v-if="timeMode === 'other'"
-              type="button"
-              class="primary-button"
-              @click="submitCustomTime"
-            >
-              Continue
-            </button>
-          </div>
-        </template>
-
-        <template v-else-if="currentWizardStep.key === 'budget'">
-          <p class="section-kicker">3. Budget</p>
-          <h3 class="wizard-question">What budget feels right?</h3>
-          <p class="wizard-note">Pick a budget that feels comfortable.</p>
-
-          <div class="choice-chip-grid">
-            <button
-              v-for="option in budgetOptions"
-              :key="option.value"
-              type="button"
-              class="choice-chip"
-              :class="{ active: state.constraints.budget_preference === option.value }"
-              :aria-pressed="state.constraints.budget_preference === option.value"
-              @click="handleBudgetSelect(option.value)"
-            >
-              <span class="mood-copy">{{ option.label }}</span>
-            </button>
-          </div>
-
-          <div class="wizard-nav">
-            <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
-          </div>
-        </template>
-
-        <template v-else-if="currentWizardStep.key === 'social'">
-          <p class="section-kicker">4. Social</p>
-          <h3 class="wizard-question">Who is joining today?</h3>
-          <p class="wizard-note">We will suggest activities that fit this.</p>
-
-          <div class="choice-chip-grid">
-            <button
-              v-for="preference in availableSocialOptions"
-              :key="preference.value"
-              type="button"
-              class="choice-chip"
-              :class="{ active: state.constraints.social_preference === preference.value }"
-              :aria-pressed="state.constraints.social_preference === preference.value"
-              @click="handleSocialSelect(preference.value)"
-            >
-              <span class="mood-copy">{{ preference.label }}</span>
-            </button>
-          </div>
-
-          <div class="wizard-nav">
-            <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
-          </div>
-        </template>
-
-        <template v-else-if="currentWizardStep.key === 'surprise'">
-          <p class="section-kicker">5. Surprise</p>
-          <h3 class="wizard-question">Ready for a surprise?</h3>
-          <p class="wizard-note">
-            We will pick an activity based on your choices. Not happy with it? You can reroll later.
-          </p>
-
-          <div class="wizard-summary">
-            <div class="wizard-summary-pill">
-              <strong>Mood</strong>
-              <span>{{ selectedMoodLabel }}</span>
-            </div>
-            <div class="wizard-summary-pill">
-              <strong>Time</strong>
-              <span>{{ state.constraints.time_minutes || "Not set" }} min</span>
-            </div>
-            <div class="wizard-summary-pill">
-              <strong>Budget</strong>
-              <span>{{ selectedBudgetLabel }}</span>
-            </div>
-            <div class="wizard-summary-pill">
-              <strong>Social</strong>
-              <span>{{ selectedSocialLabel }}</span>
-            </div>
-          </div>
-
-          <div class="field">
-            <span>Optional excluded categories</span>
-            <div class="tag-grid">
+          <template v-if="currentWizardStep.key === 'mood'">
+            <h3 class="wizard-question">How are you feeling today?</h3>
+            <p class="wizard-note">Tell us the vibe.<br>We will match the activity to it.</p>
+            <div class="choice-chip-grid">
               <button
-                v-for="category in excludeCategoryOptions"
-                :key="category.key"
+                v-for="mood in availableMoodOptions"
+                :key="mood.value"
                 type="button"
-                class="tag-button"
-                :class="{ active: isCategoryExcluded(category) }"
-                @click="toggleCategoryGroup(category.rawValues)"
+                class="choice-chip"
+                :class="{ active: state.constraints.mood === mood.value }"
+                @click="handleMoodSelect(mood.value)"
               >
-                <span v-if="isCategoryExcluded(category)" class="exclude-mark" aria-hidden="true">
-                  ❌
-                </span>
-                <CategoryIcon
-                  :name="category.icon"
-                  :src="category.iconSrc"
-                  class="category-chip-icon"
-                />
-                <span>{{ category.label }}</span>
+                <span class="mood-copy">{{ mood.label }}</span>
               </button>
             </div>
-          </div>
+          </template>
 
-          <p v-if="hasPendingAcceptedSuggestion" class="inline-hint">
-            You already have one accepted activity in history. You can still generate another.
-          </p>
+          <template v-else-if="currentWizardStep.key === 'time'">
+            <h3 class="wizard-question">How much time do you have?</h3>
+            <p class="wizard-note">Pick a quick option<br>or enter your own time.</p>
 
-          <article
-            class="surprise-action-card"
-            :class="{ rolling: isRollingDice || state.busy.generate }"
-          >
-            <div class="surprise-dice-wrap">
-              <span class="surprise-dice-ring" />
-              <img class="surprise-dice-icon" :src="diceIcon" alt="" />
+            <div class="time-choice-list">
+              <button
+                v-for="minutes in quickTimeChoices"
+                :key="minutes"
+                type="button"
+                class="time-choice-chip"
+                :class="{ active: isQuickTimeActive(minutes) && timeMode === 'quick' }"
+                @click="selectQuickTime(minutes)"
+              >
+                {{ minutes }} min
+              </button>
+              <button
+                type="button"
+                class="time-choice-chip"
+                :class="{ active: timeMode === 'other' }"
+                @click="selectCustomTime"
+              >
+                Custom time
+              </button>
             </div>
 
-            <div class="surprise-action-copy">
-              <strong>Roll a random pick</strong>
-              <p>One tap, one fresh idea. If it is not right, reroll in Result.</p>
+            <input
+              v-if="timeMode === 'other'"
+              v-model.number="state.constraints.time_minutes"
+              type="number"
+              min="5" max="1440" step="5"
+              placeholder="e.g. 45"
+              class="time-other-input"
+              @keydown.enter.prevent="submitCustomTime"
+            />
+
+            <div class="wizard-nav">
+              <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
+              <button v-if="timeMode === 'other'" type="button" class="primary-button" @click="submitCustomTime">
+                Continue
+              </button>
             </div>
+          </template>
 
-            <button
-              class="primary-button generate-button wizard-surprise-button"
-              :disabled="!isLoggedIn || state.busy.generate || isRollingDice"
-              @click="handleGenerateFromSurprise"
-            >
-              {{ state.busy.generate || isRollingDice ? "Rolling the dice..." : "✨ Surprise me" }}
-            </button>
-          </article>
+          <template v-else-if="currentWizardStep.key === 'budget'">
+            <h3 class="wizard-question">What budget feels right?</h3>
+            <p class="wizard-note">Pick a budget that feels comfortable.</p>
+            <div class="choice-chip-grid">
+              <button
+                v-for="option in budgetOptions"
+                :key="option.value"
+                type="button"
+                class="choice-chip"
+                :class="{ active: state.constraints.budget_preference === option.value }"
+                @click="handleBudgetSelect(option.value)"
+              >
+                <span class="mood-copy">{{ option.label }}</span>
+              </button>
+            </div>
+            <div class="wizard-nav">
+              <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
+            </div>
+          </template>
 
-          <div class="wizard-nav">
-            <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
-          </div>
-        </template>
+          <template v-else-if="currentWizardStep.key === 'social'">
+            <h3 class="wizard-question">Who is joining today?</h3>
+            <p class="wizard-note">We will suggest activities that fit this.</p>
+            <div class="choice-chip-grid">
+              <button
+                v-for="preference in availableSocialOptions"
+                :key="preference.value"
+                type="button"
+                class="choice-chip"
+                :class="{ active: state.constraints.social_preference === preference.value }"
+                @click="handleSocialSelect(preference.value)"
+              >
+                <span class="mood-copy">{{ preference.label }}</span>
+              </button>
+            </div>
+            <div class="wizard-nav">
+              <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
+            </div>
+          </template>
 
-        <template v-else>
-          <p class="section-kicker">6. Result</p>
-          <h3 class="wizard-question">Your suggestion</h3>
-          <p class="wizard-note">Take a look. You can accept it, save it, or try another one.</p>
+          <template v-else-if="currentWizardStep.key === 'summary'">
+            <h3 class="wizard-question">Confirm your settings</h3>
+            <p class="wizard-note">Check your preferences below.</p>
+            <div class="wizard-summary">
+              <div class="wizard-summary-pill"><strong>Mood</strong> <span>{{ selectedMoodLabel }}</span></div>
+              <div class="wizard-summary-pill"><strong>Time</strong> <span>{{ state.constraints.time_minutes || "Not set" }} min</span></div>
+              <div class="wizard-summary-pill"><strong>Budget</strong> <span>{{ selectedBudgetLabel }}</span></div>
+              <div class="wizard-summary-pill"><strong>Social</strong> <span>{{ selectedSocialLabel }}</span></div>
+            </div>
+            <div class="field">
+              <span>Optional excluded categories</span>
+              <div class="tag-grid">
+                <button
+                  v-for="category in excludeCategoryOptions"
+                  :key="category.key"
+                  type="button"
+                  class="tag-button"
+                  :class="{ active: isCategoryExcluded(category) }"
+                  @click="toggleCategoryGroup(category.rawValues)"
+                >
+                  <span v-if="isCategoryExcluded(category)" class="exclude-mark" aria-hidden="true">❌</span>
+                  <CategoryIcon :name="category.icon" :src="category.iconSrc" class="category-chip-icon" />
+                  <span>{{ category.label }}</span>
+                </button>
+              </div>
+            </div>
+            <div class="wizard-nav">
+              <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
+              <button type="button" class="primary-button" @click="goNextStep">Looks good</button>
+            </div>
+          </template>
 
-          <ResultCard embedded />
+          <template v-else-if="currentWizardStep.key === 'roll'">
+            <h3 class="wizard-question">Ready for a surprise?</h3>
+            <p class="wizard-note">One tap, one fresh idea.</p>
+            <article class="surprise-action-card" :class="{ rolling: isRollingDice || state.busy.generate }" style="margin-top: 2rem;">
+              <div class="surprise-dice-wrap">
+                <span class="surprise-dice-ring" />
+                <img class="surprise-dice-icon" :src="diceIcon" alt="" />
+              </div>
+              <div class="surprise-action-copy">
+                <strong>Roll a random pick</strong>
+                <p>If it is not right, reroll in Result.</p>
+              </div>
+              <button
+                class="primary-button generate-button wizard-surprise-button"
+                :disabled="!isLoggedIn || state.busy.generate || isRollingDice"
+                @click="handleGenerateFromSurprise"
+              >
+                {{ state.busy.generate || isRollingDice ? "Rolling..." : "✨ Surprise me" }}
+              </button>
+            </article>
+            <div class="wizard-nav">
+              <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
+            </div>
+          </template>
 
-          <div class="wizard-nav">
-            <button
-              type="button"
-              class="ghost-button"
-              @click="setWizardStep(STEP_INDEX.surprise, 'backward')"
-            >
-              Adjust choices
-            </button>
-          </div>
-        </template>
+          <template v-else-if="currentWizardStep.key === 'result'">
+            <h3 class="wizard-question">Your suggestion</h3>
+            <ResultCard embedded />
+            <div class="wizard-nav">
+              <button type="button" class="ghost-button" @click="setWizardStep(STEP_INDEX.summary, 'backward')">Adjust choices</button>
+            </div>
+          </template>
         </article>
       </Transition>
     </div>
-
     <p v-if="wizardError" class="form-inline-error">{{ wizardError }}</p>
   </section>
 </template>
+
+<style scoped>
+/* --- 1. 时间选项居中与形状完美修复 --- */
+.time-choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin: 1.5rem 0;
+}
+
+.time-other-input {
+  display: block;
+  margin: 1rem auto;
+  text-align: center;
+  max-width: 240px;
+}
+
+/* 强制前 4 个具体时间选项为绝对的完美圆形 (解决 5 min 不圆的问题) */
+.time-choice-list .time-choice-chip:not(:last-child) {
+  width: 88px;
+  height: 88px;
+  padding: 0; /* 清除默认内边距的干扰 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+/* 保证最后一个 "Custom time" 选项高度一致，且为胶囊形状 */
+.time-choice-list .time-choice-chip:last-child {
+  height: 88px;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 44px; /* 高度的一半 */
+}
+
+
+/* --- 2. 只有骰子专属的动画，绝对不影响全局其他图标！ --- */
+.surprise-dice-wrap {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 1.5rem;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.surprise-dice-icon {
+  display: block !important;
+  width: 54px !important;
+  height: 54px !important;
+  z-index: 5;
+  animation: dice-float-idle 2.5s ease-in-out infinite !important;
+  filter: drop-shadow(0 5px 8px rgba(0,0,0,0.15));
+}
+
+.surprise-dice-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px dashed #00796b !important;
+  border-radius: 50%;
+  opacity: 0.4;
+  animation: ring-spin-idle 10s linear infinite !important;
+}
+
+.rolling .surprise-dice-icon {
+  animation: dice-active-jump 0.4s ease-in-out infinite !important;
+}
+
+.rolling .surprise-dice-ring {
+  animation: ring-spin-fast 0.6s linear infinite !important;
+  border-style: solid !important;
+  border-color: #ffca28 !important;
+  opacity: 1;
+}
+
+@keyframes dice-float-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes ring-spin-idle {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes dice-active-jump {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.08); }
+}
+@keyframes ring-spin-fast {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+</style>
