@@ -38,7 +38,10 @@ const STEP_INDEX = {
   result: 6,
 };
 
-const quickTimeChoices = [5, 15, 30, 60];
+// --- 修改处：添加了 10 min 选项 ---
+const quickTimeChoices = [5, 10, 15, 30, 60];
+// ------------------------------
+
 const wizardStepIndex = ref(0);
 const wizardDirection = ref("forward");
 const wizardError = ref("");
@@ -316,7 +319,7 @@ onBeforeUnmount(() => {
           <template v-if="currentWizardStep.key === 'mood'">
             <h3 class="wizard-question">How are you feeling today?</h3>
             <p class="wizard-note">Tell us the vibe.<br>We will match the activity to it.</p>
-            <div class="choice-chip-grid">
+            <div class="choice-chip-grid mood-options-grid">
               <button
                 v-for="mood in availableMoodOptions"
                 :key="mood.value"
@@ -501,29 +504,29 @@ onBeforeUnmount(() => {
   max-width: 240px;
 }
 
-/* 强制前 4 个具体时间选项为绝对的完美圆形 (解决 5 min 不圆的问题) */
+/* 强制除了最后一个（Custom time）以外的所有时间选项为绝对的完美圆形 */
 .time-choice-list .time-choice-chip:not(:last-child) {
   width: 88px;
   height: 88px;
-  padding: 0; /* 清除默认内边距的干扰 */
+  padding: 0; 
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
 }
 
-/* 保证最后一个 "Custom time" 选项高度一致，且为胶囊形状 */
+/* 保证最后一个 "Custom time" 选项为胶囊形状 */
 .time-choice-list .time-choice-chip:last-child {
   height: 88px;
   padding: 0 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 44px; /* 高度的一半 */
+  border-radius: 44px;
 }
 
 
-/* --- 2. 只有骰子专属的动画，绝对不影响全局其他图标！ --- */
+/* --- 2. 只有骰子专属的动画 --- */
 .surprise-dice-wrap {
   position: relative;
   width: 100px;
@@ -578,5 +581,32 @@ onBeforeUnmount(() => {
 @keyframes ring-spin-fast {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* --- 3. 新增：将卡片问句稍微往下移一点 --- */
+.wizard-question {
+  margin-top: 2rem; 
+}
+
+/* --- 4. 新增：仅将第一个卡片（Mood）的选项整体向上移，并修复缩小和变扁的问题 --- */
+.mood-options-grid {
+  width: 100% !important; 
+  margin-top: 1.5rem !important; 
+  margin-bottom: auto !important; 
+}
+
+/* 强制恢复按钮的高度，并稍微缩减左右内边距给文字留出空间 */
+.mood-options-grid .choice-chip {
+  min-height: 140px !important; 
+  padding-left: 0.5rem !important;  /* 把左右内边距变小一点 */
+  padding-right: 0.5rem !important;
+}
+
+/* --- 5. 新增：强制选项文字保持在一行 --- */
+.mood-options-grid .mood-copy {
+  white-space: nowrap !important; /* 强制不换行 */
+  
+  /* 如果字太大了，可以把下面这行的注释符号删掉来缩小字号 */
+  /* font-size: 0.9rem !important; */
 }
 </style>
