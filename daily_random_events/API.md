@@ -41,7 +41,7 @@ Authorization: Token <token>
 ```json
 {
   "count": 23,
-  "next": "http://localhost:8000/api/logs/?page=2",
+  "next": "https://it-random-api.onrender.com/api/logs/?page=2",
   "previous": null,
   "pending": null,
   "results": []

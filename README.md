@@ -169,14 +169,14 @@ This repository now includes starter deployment files for Render:
 
 The suggested setup is:
 
-1. Deploy the Django API as a Python web service.
-2. Deploy the Vue app as a static site.
+1. Deploy the Vue app as a static site (`https://it-random.onrender.com`).
+2. Deploy the Django API as a Python web service (`https://it-random-api.onrender.com`).
 3. Set `VITE_API_BASE_URL` in the front-end deployment to the public API URL, ending with `/api`.
 
 Example:
 
 ```text
-VITE_API_BASE_URL=https://your-backend-service.onrender.com/api
+VITE_API_BASE_URL=https://it-random-api.onrender.com/api
 ```
 
 ### Production hardening defaults

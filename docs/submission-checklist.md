@@ -7,7 +7,7 @@ Use this as the final hand-in checklist.
 - [ ] Export the written report to PDF
 - [ ] Zip the full application code
 - [ ] Confirm the public repository link works
-- [ ] Confirm the deployed application URL works
+- [ ] Confirm the deployed application URL works (`https://it-random.onrender.com`)
 
 ## Report content
 

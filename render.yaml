@@ -14,12 +14,14 @@ services:
       - key: DJANGO_CSRF_TRUSTED_ORIGINS
         value: "https://*.onrender.com"
       - key: DJANGO_CORS_ALLOWED_ORIGINS
-        value: "https://it-random-frontend.onrender.com"
+        value: "https://it-random.onrender.com"
+      - key: FRONTEND_BASE_URL
+        value: "https://it-random.onrender.com"
       - key: DJANGO_SECRET_KEY
         generateValue: true
 
   - type: static
-    name: it-random-frontend
+    name: it-random
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist

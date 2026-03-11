@@ -13,7 +13,7 @@ Random Activity Flow is a web application that helps a user choose a realistic d
 https://github.com/Danhuang11223/IT_random
 
 **Deployed application:**  
-Add your public URL here after deployment.
+https://it-random.onrender.com
 
 **Adjustments from the original design specification:**  
 
