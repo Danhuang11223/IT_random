@@ -4,8 +4,7 @@ import { RouterView } from "vue-router";
 
 <template>
   <div class="root-shell">
-
-      <div class="bg-decor">
+    <div class="bg-decor">
       <img src="/decor/heart.svg" class="bg-icon i1" alt="" />
       <img src="/decor/mug.svg" class="bg-icon i2" alt="" />
       <img src="/decor/headphones.svg" class="bg-icon i3" alt="" />
@@ -17,8 +16,8 @@ import { RouterView } from "vue-router";
       <img src="/decor/emoji.svg" class="bg-icon i9" alt="" />
     </div>
 
-    <RouterView />
-
+    <div class="desktop-scale-shell">
+      <RouterView />
+    </div>
   </div>
 </template>
-

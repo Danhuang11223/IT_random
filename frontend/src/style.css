@@ -27,6 +27,7 @@
   --space-4: 16px;
   --space-6: 24px;
   --shadow-soft: 0 12px 26px rgba(30, 48, 70, 0.08);
+  --app-scale: 0.67;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -80,6 +81,25 @@ button {
 
 #app {
   min-height: 100vh;
+}
+
+.desktop-scale-shell {
+  width: 100%;
+  margin: 0 auto;
+}
+
+@supports (zoom: 1) {
+  .desktop-scale-shell {
+    zoom: var(--app-scale);
+  }
+}
+
+@supports not (zoom: 1) {
+  .desktop-scale-shell {
+    width: calc(100% / var(--app-scale));
+    transform: scale(var(--app-scale));
+    transform-origin: top center;
+  }
 }
 
 .root-shell {
@@ -3691,43 +3711,104 @@ body.pref-high-contrast .pending-log-card {
 
 }
 
-/* Keep phone layout closer to desktop to reduce long single-column scrolling. */
-@media (max-width: 760px) {
-  .dashboard-header,
-  .dashboard-header-side {
-    flex-direction: row;
-    align-items: flex-start;
-  }
-
-  .dashboard-header-side {
-    width: auto;
-    margin-left: auto;
-    justify-content: flex-end;
-  }
-
-  .nav-links {
-    width: auto;
-    overflow-x: visible;
-  }
-
-  .nav-links a {
-    flex: 0 0 auto;
-  }
-
-  .filter-pills {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .choice-chip-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+/* Force desktop layout rules on every device to keep phone and desktop consistent. */
+.desktop-scale-shell .dashboard-layout {
+  width: min(1220px, calc(100% - 32px)) !important;
 }
 
-@media (max-width: 560px) {
-  .filter-pills,
-  .choice-chip-grid,
-  .tag-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.desktop-scale-shell .dashboard-header {
+  flex-direction: row !important;
+  align-items: flex-start !important;
+}
+
+.desktop-scale-shell .dashboard-header-side {
+  flex-direction: row !important;
+  align-items: center !important;
+  width: auto !important;
+  justify-content: flex-end !important;
+}
+
+.desktop-scale-shell .nav-links {
+  width: auto !important;
+  justify-content: flex-start !important;
+  overflow-x: visible !important;
+}
+
+.desktop-scale-shell .nav-links a {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+}
+
+.desktop-scale-shell .a11y-menu,
+.desktop-scale-shell .profile-menu {
+  width: auto !important;
+}
+
+.desktop-scale-shell .a11y-trigger,
+.desktop-scale-shell .profile-trigger {
+  width: auto !important;
+  justify-content: center !important;
+}
+
+.desktop-scale-shell .a11y-dropdown,
+.desktop-scale-shell .profile-dropdown {
+  left: auto !important;
+  right: 0 !important;
+  width: auto !important;
+  min-width: 220px !important;
+}
+
+.desktop-scale-shell .single-column {
+  width: min(100%, 620px) !important;
+  max-width: 620px !important;
+}
+
+.desktop-scale-shell .generator-flow-single {
+  width: min(100%, 760px) !important;
+  max-width: 760px !important;
+}
+
+.desktop-scale-shell .history-flow {
+  width: min(100%, 1020px) !important;
+  max-width: 1020px !important;
+}
+
+.desktop-scale-shell .filter-pills {
+  display: flex !important;
+  flex-wrap: wrap !important;
+}
+
+.desktop-scale-shell .choice-chip-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.desktop-scale-shell .tag-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.desktop-scale-shell .wizard-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.desktop-scale-shell .metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.desktop-scale-shell .auth-layout {
+  grid-template-columns: minmax(300px, 430px) minmax(0, 560px) !important;
+}
+
+.desktop-scale-shell .auth-layout.auth-chat-layout {
+  width: min(1320px, calc(100% - 28px)) !important;
+}
+
+.desktop-scale-shell .auth-chat-shell {
+  grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr) !important;
+  gap: 28px !important;
+  padding: 26px 30px 28px !important;
+}
+
+.desktop-scale-shell .auth-chat-hero {
+  min-height: 640px !important;
+  padding: 18px 20px 22px !important;
 }
