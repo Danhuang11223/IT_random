@@ -38,7 +38,7 @@ const STEP_INDEX = {
   result: 6,
 };
 
-// --- 修改处：添加了 10 min 选项 ---
+// --- Change: added a 10 min option ---
 const quickTimeChoices = [5, 10, 15, 30, 60];
 // ------------------------------
 
@@ -488,7 +488,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* --- 1. 时间选项居中与形状完美修复 --- */
+/* --- 1. Center time options and refine shape consistency --- */
 .time-choice-list {
   display: flex;
   flex-wrap: wrap;
@@ -504,7 +504,7 @@ onBeforeUnmount(() => {
   max-width: 240px;
 }
 
-/* 强制除了最后一个（Custom time）以外的所有时间选项为绝对的完美圆形 */
+/* Force all time options except the last one (Custom time) to be perfect circles. */
 .time-choice-list .time-choice-chip:not(:last-child) {
   width: 88px;
   height: 88px;
@@ -515,7 +515,7 @@ onBeforeUnmount(() => {
   border-radius: 50%;
 }
 
-/* 保证最后一个 "Custom time" 选项为胶囊形状 */
+/* Keep the last "Custom time" option in a pill shape. */
 .time-choice-list .time-choice-chip:last-child {
   height: 88px;
   padding: 0 1.5rem;
@@ -526,7 +526,7 @@ onBeforeUnmount(() => {
 }
 
 
-/* --- 2. 只有骰子专属的动画 --- */
+/* --- 2. Dice-specific animation only --- */
 .surprise-dice-wrap {
   position: relative;
   width: 100px;
@@ -583,30 +583,30 @@ onBeforeUnmount(() => {
   to { transform: rotate(360deg); }
 }
 
-/* --- 3. 新增：将卡片问句稍微往下移一点 --- */
+/* --- 3. New: move the card question slightly downward --- */
 .wizard-question {
   margin-top: 2rem; 
 }
 
-/* --- 4. 新增：仅将第一个卡片（Mood）的选项整体向上移，并修复缩小和变扁的问题 --- */
+/* --- 4. New: move the first card (Mood) options up and fix shrink/flatten behavior --- */
 .mood-options-grid {
   width: 100% !important; 
   margin-top: 1.5rem !important; 
   margin-bottom: auto !important; 
 }
 
-/* 强制恢复按钮的高度，并稍微缩减左右内边距给文字留出空间 */
+/* Restore button height and slightly reduce horizontal padding for label space. */
 .mood-options-grid .choice-chip {
   min-height: 140px !important; 
-  padding-left: 0.5rem !important;  /* 把左右内边距变小一点 */
+  padding-left: 0.5rem !important;  /* Reduce horizontal padding slightly. */
   padding-right: 0.5rem !important;
 }
 
-/* --- 5. 新增：强制选项文字保持在一行 --- */
+/* --- 5. New: force option text to remain on a single line --- */
 .mood-options-grid .mood-copy {
-  white-space: nowrap !important; /* 强制不换行 */
+  white-space: nowrap !important; /* Force single-line text. */
   
-  /* 如果字太大了，可以把下面这行的注释符号删掉来缩小字号 */
+  /* If text appears too large, uncomment the line below to reduce font size. */
   /* font-size: 0.9rem !important; */
 }
 </style>

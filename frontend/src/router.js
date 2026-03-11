@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import ForgotPasswordView from "./views/ForgotPasswordView.vue";
-// 👇 1. 引入新页面 👇
+// Step 1: import the new view.
 import ResetPasswordConfirmView from "./views/ResetPasswordConfirmView.vue";
 import { getStoredToken } from "./api";
 import AuthLayout from "./layouts/AuthLayout.vue";
@@ -36,7 +36,7 @@ const routes = [
         name: "forgotPassword",
         component: ForgotPasswordView,
       },
-      // 👇 2. 新增带参数的重置密码确认路由 👇
+      // Step 2: add reset-password confirmation route with params.
       {
         path: "reset-password-confirm/:uid/:token",
         name: "resetPasswordConfirm",

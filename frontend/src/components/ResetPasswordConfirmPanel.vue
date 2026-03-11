@@ -1,6 +1,7 @@
 <script setup>
 import { reactive, ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import { confirmPasswordReset } from "../api";
 
 const router = useRouter();
 const route = useRoute(); 
@@ -23,33 +24,32 @@ async function submit() {
   }
 
  
-  if (form.new_password.length < 6) {
-    errorMessage.value = "Password must be at least 6 characters.";
+  if (form.new_password.length < 8) {
+    errorMessage.value = "Password must be at least 8 characters.";
     return;
   }
 
   isSubmitting.value = true;
   try {
-    const response = await fetch('http://127.0.0.1:8000/api/auth/password-reset-confirm/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        uid: route.params.uid,
-        token: route.params.token,
-        new_password: form.new_password
-      })
+    const data = await confirmPasswordReset({
+      uid: String(route.params.uid || ""),
+      token: String(route.params.token || ""),
+      new_password: form.new_password,
     });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      alert("Password updated successfully! Please login.");
-      router.push("/login");
-    } else {
-      errorMessage.value = data.error || "The link is invalid or expired.";
-    }
+    alert(data.message || "Password updated successfully! Please login.");
+    router.push("/login");
   } catch (error) {
-    errorMessage.value = "Connection failed. Is the backend running?";
+    const validationError = error?.response?.data?.new_password;
+    if (Array.isArray(validationError) && validationError.length) {
+      errorMessage.value = String(validationError[0]);
+      return;
+    }
+
+    errorMessage.value = (
+      error?.response?.data?.error
+      || error?.response?.data?.detail
+      || "Connection failed. Is the backend running?"
+    );
   } finally {
     isSubmitting.value = false;
   }
@@ -73,7 +73,7 @@ async function submit() {
         <input 
           v-model="form.new_password" 
           type="password" 
-          placeholder="At least 6 characters"
+          placeholder="At least 8 characters"
           required 
         />
       </label>

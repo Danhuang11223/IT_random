@@ -1,6 +1,7 @@
 <script setup>
 import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
+import { requestPasswordReset } from "../api";
 
 const router = useRouter();
 const form = reactive({
@@ -10,7 +11,7 @@ const form = reactive({
 const isSending = ref(false);
 const emailError = ref(""); 
 
-// 验证逻辑保持不变，但触发的时机变了
+// Validation logic stays the same; only the trigger timing changed.
 function validateEmail() {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   
@@ -33,28 +34,27 @@ async function submit() {
   isSending.value = true;
   
   try {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL;
-    const response = await fetch(`${baseUrl}/auth/password-reset/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: form.email })
-    });
+    const data = await requestPasswordReset(form.email);
 
-    const data = await response.json();
-
-    if (response.ok) {
+    if (data.demo_link) {
       window.prompt(
-        "[Demo Mode] Link generated. Please copy the link below and open it in a new window:", 
+        "[Demo Mode] Link generated. Please copy the link below and open it in a new window:",
         data.demo_link
       );
       console.log("Password Reset Link:", data.demo_link);
-      router.push("/login"); 
-    } else {
-      alert(`Error: ${data.error || 'This email does not exist.'}`);
     }
+    alert(
+      data.message
+      || "If an account with that email exists, a password reset link has been generated."
+    );
+    router.push("/login");
   } catch (error) {
     console.error(error);
-    alert("Network request failed. Please check if the backend server is running.");
+    alert(
+      error?.response?.data?.detail
+      || error?.response?.data?.error
+      || "Network request failed. Please check if the backend server is running."
+    );
   } finally {
     isSending.value = false;
   }

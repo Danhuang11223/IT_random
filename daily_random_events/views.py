@@ -3,22 +3,26 @@ import csv
 import io
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from django.db.models import Q
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from django.utils.http import urlsafe_base64_encode
 from rest_framework import generics, permissions, status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from django.contrib.auth.tokens import default_token_generator
-from django.utils.http import urlsafe_base64_encode
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_decode
-from django.utils.encoding import force_str
 
 from .models import (
     Activity,
@@ -308,6 +312,8 @@ class AdminActivityPagination(PageNumberPagination):
 
 
 class RegisterView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth"
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
@@ -326,6 +332,8 @@ class RegisterView(APIView):
 
 
 class LoginView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "auth"
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
@@ -849,63 +857,80 @@ class AdminAuditLogListView(generics.ListAPIView):
     pagination_class = AdminAuditLogPagination
     queryset = AdminAuditLog.objects.select_related("admin_user").all()
 
-class PasswordResetDemoView(APIView):
 
+class PasswordResetDemoView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_reset"
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        email = request.data.get('email')
+        email = str(request.data.get("email") or "").strip()
         if not email:
             return Response(
-                {'error': 'Please provide an email address.'}, 
+                {"error": "Please provide an email address."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        user = User.objects.filter(email=email).first()
-        
-        if user:
-        
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
-            
-            
-            reset_link = f"http://localhost:5173/reset-password-confirm/{uid}/{token}"
-            
-        
-            return Response({
-                'message': 'Success',
-                'demo_link': reset_link
-            }, status=status.HTTP_200_OK)
+        user = User.objects.filter(email__iexact=email).first()
+        response_payload = {
+            "message": (
+                "If an account with that email exists, "
+                "a password reset link has been generated."
+            )
+        }
 
-        return Response(
-            {'error': 'No user found with this email.'}, 
-            status=status.HTTP_404_NOT_FOUND
-        )
+        base_url = (settings.FRONTEND_BASE_URL or "").rstrip("/")
+        if base_url and settings.DEMO_PASSWORD_RESET_LINKS:
+            uid = urlsafe_base64_encode(force_bytes(user.pk if user else "0"))
+            token = (
+                default_token_generator.make_token(user)
+                if user
+                else "invalid-token"
+            )
+            response_payload["demo_link"] = (
+                f"{base_url}/reset-password-confirm/{uid}/{token}"
+            )
+
+        return Response(response_payload, status=status.HTTP_200_OK)
+
+
 class PasswordResetConfirmView(APIView):
-    
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "password_reset"
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        uidb64 = request.data.get('uid')
-        token = request.data.get('token')
-        new_password = request.data.get('new_password')
+        uidb64 = request.data.get("uid")
+        token = request.data.get("token")
+        new_password = request.data.get("new_password")
 
         if not all([uidb64, token, new_password]):
-            return Response({'error': 'Missing data.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Missing data."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-        
             uid = force_str(urlsafe_base64_decode(uidb64))
             user = User.objects.get(pk=uid)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             user = None
 
-    
         if user is not None and default_token_generator.check_token(user, token):
+            try:
+                validate_password(new_password, user)
+            except DjangoValidationError as exc:
+                return Response(
+                    {"new_password": list(exc.messages)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             user.set_password(new_password)
             user.save()
-            return Response({'message': 'Password has been reset successfully.'}, status=status.HTTP_200_OK)
-        
-        return Response({'error': 'Invalid or expired link.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"message": "Password has been reset successfully."},
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {"error": "Invalid or expired link."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )

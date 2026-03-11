@@ -69,6 +69,8 @@ CORS_ALLOWED_ORIGINS = env_list(
 )
 CORS_ALLOWED_ORIGIN_REGEXES = env_list("DJANGO_CORS_ALLOWED_ORIGIN_REGEXES", "")
 CORS_ALLOW_ALL_ORIGINS = env_flag("DJANGO_CORS_ALLOW_ALL", False)
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
+DEMO_PASSWORD_RESET_LINKS = env_flag("DEMO_PASSWORD_RESET_LINKS", False)
 
 
 # Application definition
@@ -193,4 +195,15 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': os.getenv('DRF_THROTTLE_ANON', '120/min'),
+        'user': os.getenv('DRF_THROTTLE_USER', '240/min'),
+        'auth': os.getenv('DRF_THROTTLE_AUTH', '20/min'),
+        'password_reset': os.getenv('DRF_THROTTLE_PASSWORD_RESET', '10/min'),
+    },
 }

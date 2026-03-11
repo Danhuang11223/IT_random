@@ -14,7 +14,16 @@ export function getStoredToken() {
 
 export function getStoredUser() {
   const raw = window.localStorage.getItem(USER_KEY);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    window.localStorage.removeItem(USER_KEY);
+    return null;
+  }
 }
 
 export function clearSession() {
@@ -43,6 +52,16 @@ export async function login(credentials) {
 export async function register(payload) {
   const response = await api.post("/auth/register/", payload);
   setSession(response.data.token, response.data.user);
+  return response.data;
+}
+
+export async function requestPasswordReset(email) {
+  const response = await api.post("/auth/password-reset/", { email });
+  return response.data;
+}
+
+export async function confirmPasswordReset(payload) {
+  const response = await api.post("/auth/password-reset-confirm/", payload);
   return response.data;
 }
 
