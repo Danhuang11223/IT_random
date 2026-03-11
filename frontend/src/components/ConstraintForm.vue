@@ -506,8 +506,8 @@ onBeforeUnmount(() => {
 
 /* Force all time options except the last one (Custom time) to be perfect circles. */
 .time-choice-list .time-choice-chip:not(:last-child) {
-  width: 88px;
-  height: 88px;
+  width: 74px;
+  height: 74px;
   padding: 0; 
   display: flex;
   align-items: center;
@@ -517,12 +517,12 @@ onBeforeUnmount(() => {
 
 /* Keep the last "Custom time" option in a pill shape. */
 .time-choice-list .time-choice-chip:last-child {
-  height: 88px;
-  padding: 0 1.5rem;
+  height: 74px;
+  padding: 0 1.1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 44px;
+  border-radius: 37px;
 }
 
 
@@ -585,28 +585,48 @@ onBeforeUnmount(() => {
 
 /* --- 3. New: move the card question slightly downward --- */
 .wizard-question {
-  margin-top: 2rem; 
+  margin-top: 0.3rem;
 }
 
 /* --- 4. New: move the first card (Mood) options up and fix shrink/flatten behavior --- */
 .mood-options-grid {
   width: 100% !important; 
-  margin-top: 1.5rem !important; 
+  margin-top: 0.55rem !important;
   margin-bottom: auto !important; 
 }
 
 /* Restore button height and slightly reduce horizontal padding for label space. */
 .mood-options-grid .choice-chip {
-  min-height: 140px !important; 
+  min-height: 108px !important;
   padding-left: 0.5rem !important;  /* Reduce horizontal padding slightly. */
   padding-right: 0.5rem !important;
 }
 
 /* --- 5. New: force option text to remain on a single line --- */
 .mood-options-grid .mood-copy {
-  white-space: nowrap !important; /* Force single-line text. */
-  
-  /* If text appears too large, uncomment the line below to reduce font size. */
-  /* font-size: 0.9rem !important; */
+  white-space: normal !important;
+  text-align: center;
+  line-height: 1.2;
+}
+
+@media (max-width: 560px) {
+  .time-choice-list .time-choice-chip:not(:last-child) {
+    width: 64px;
+    height: 64px;
+  }
+
+  .time-choice-list .time-choice-chip:last-child {
+    height: 64px;
+    padding: 0 0.9rem;
+    border-radius: 32px;
+  }
+
+  .mood-options-grid {
+    margin-top: 0.35rem !important;
+  }
+
+  .mood-options-grid .choice-chip {
+    min-height: 92px !important;
+  }
 }
 </style>

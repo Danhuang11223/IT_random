@@ -3690,3 +3690,44 @@ body.pref-high-contrast .pending-log-card {
 
 
 }
+
+/* Keep phone layout closer to desktop to reduce long single-column scrolling. */
+@media (max-width: 760px) {
+  .dashboard-header,
+  .dashboard-header-side {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .dashboard-header-side {
+    width: auto;
+    margin-left: auto;
+    justify-content: flex-end;
+  }
+
+  .nav-links {
+    width: auto;
+    overflow-x: visible;
+  }
+
+  .nav-links a {
+    flex: 0 0 auto;
+  }
+
+  .filter-pills {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .choice-chip-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .filter-pills,
+  .choice-chip-grid,
+  .tag-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
