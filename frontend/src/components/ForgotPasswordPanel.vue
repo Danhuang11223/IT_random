@@ -8,13 +8,33 @@ const form = reactive({
 });
 
 const isSending = ref(false);
+const emailError = ref(""); 
+
+// 验证逻辑保持不变，但触发的时机变了
+function validateEmail() {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  
+  if (!form.email) {
+    emailError.value = "Please enter your email address.";
+    return false;
+  }
+  if (!emailRegex.test(form.email)) {
+    emailError.value = "Please enter a valid email address (e.g., name@example.com).";
+    return false;
+  }
+  
+  emailError.value = ""; 
+  return true;
+}
 
 async function submit() {
+  if (!validateEmail()) return;
+  
   isSending.value = true;
+  
   try {
-    
     const baseUrl = import.meta.env.VITE_API_BASE_URL;
-const response = await fetch(`${baseUrl}/auth/password-reset/`, {
+    const response = await fetch(`${baseUrl}/auth/password-reset/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: form.email })
@@ -23,22 +43,18 @@ const response = await fetch(`${baseUrl}/auth/password-reset/`, {
     const data = await response.json();
 
     if (response.ok) {
-     
       window.prompt(
-        "【Demo 演示模式】链接已生成，请直接复制下方链接，并在新窗口打开：", 
+        "[Demo Mode] Link generated. Please copy the link below and open it in a new window:", 
         data.demo_link
       );
-      
       console.log("Password Reset Link:", data.demo_link);
-
-      
       router.push("/login"); 
     } else {
-      alert(`错误: ${data.error || '该邮箱不存在'}`);
+      alert(`Error: ${data.error || 'This email does not exist.'}`);
     }
   } catch (error) {
     console.error(error);
-    alert("网络请求失败，请检查 Django 后端是否正在运行？");
+    alert("Network request failed. Please check if the backend server is running.");
   } finally {
     isSending.value = false;
   }
@@ -52,15 +68,18 @@ const response = await fetch(`${baseUrl}/auth/password-reset/`, {
       <p>Enter your email to receive a reset link.</p>
     </div>
 
-    <form class="stack" @submit.prevent="submit">
+    <form class="stack" @submit.prevent="submit" novalidate>
       <label class="field">
         <span>Email Address</span>
         <input
           v-model="form.email"
           type="email"
           autocomplete="email"
-          required
+          @input="validateEmail" 
         />
+        <span v-if="emailError" style="color: #d32f2f; font-size: 0.85rem; margin-top: 4px; display: block;">
+          {{ emailError }}
+        </span>
       </label>
 
       <button class="primary-button roll-day-button" :disabled="isSending" type="submit">
