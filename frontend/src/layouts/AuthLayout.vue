@@ -24,15 +24,17 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", syncViewportMode);
 });
 
-const mobileLoginFocus = computed(
-  () => isMobileViewport.value && route.name === "login"
+const mobileAuthCompact = computed(
+  () =>
+    isMobileViewport.value &&
+    (route.name === "login" || route.name === "register")
 );
 </script>
 
 <template>
   <section
     class="auth-layout auth-chat-layout"
-    :class="{ 'mobile-login-shell': mobileLoginFocus }"
+    :class="{ 'mobile-auth-shell': mobileAuthCompact }"
   >
     <div class="auth-chat-shell">
       <aside class="auth-chat-hero">

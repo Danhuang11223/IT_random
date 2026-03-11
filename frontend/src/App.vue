@@ -21,8 +21,10 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", syncViewportMode);
 });
 
-const disableScaleForMobileLogin = computed(
-  () => isMobileViewport.value && route.name === "login"
+const disableScaleForMobileAuth = computed(
+  () =>
+    isMobileViewport.value &&
+    (route.name === "login" || route.name === "register")
 );
 </script>
 
@@ -40,7 +42,7 @@ const disableScaleForMobileLogin = computed(
       <img src="/decor/emoji.svg" class="bg-icon i9" alt="" />
     </div>
 
-    <div class="desktop-scale-shell" :class="{ 'no-app-scale': disableScaleForMobileLogin }">
+    <div class="desktop-scale-shell" :class="{ 'no-app-scale': disableScaleForMobileAuth }">
       <RouterView />
     </div>
   </div>

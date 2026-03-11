@@ -3822,25 +3822,25 @@ body.pref-high-contrast .pending-log-card {
   padding: 18px 20px 22px !important;
 }
 
-.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-login-shell {
+.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-auth-shell {
   width: min(760px, calc(100% - 16px)) !important;
 }
 
-.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-login-shell .auth-chat-shell {
+.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-auth-shell .auth-chat-shell {
   grid-template-columns: minmax(0, 1fr) !important;
   gap: 12px !important;
   padding: 14px !important;
 }
 
-.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-login-shell .auth-chat-hero {
+.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-auth-shell .auth-chat-hero {
   display: none !important;
 }
 
-.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-login-shell .auth-chat-stage {
+.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-auth-shell .auth-chat-stage {
   width: 100%;
 }
 
-.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-login-shell .auth-chat-form-wrap {
+.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-auth-shell .auth-chat-form-wrap {
   width: 100%;
   padding-top: 0 !important;
 }
