@@ -16,6 +16,13 @@ const importSummary = ref(null);
 const auditLogs = ref([]);
 const editingId = ref(null);
 const csvFile = ref(null);
+const adminPagination = ref({
+  count: 0,
+  page: 1,
+  total_pages: 1,
+  next: null,
+  previous: null,
+});
 const createForm = reactive({
   title: "",
   description: "",
@@ -43,7 +50,12 @@ const editForm = reactive({
   is_active: true,
 });
 const socialOptions = ["SOLO", "FRIENDS", "EITHER"];
-const totalCount = computed(() => activities.value.length);
+const totalCount = computed(() =>
+  Number(adminPagination.value.count || activities.value.length)
+);
+const hasPagination = computed(
+  () => Number(adminPagination.value.total_pages || 1) > 1
+);
 
 function normalizeTags(value) {
   return String(value || "")
@@ -82,11 +94,45 @@ function hydrateEditForm(item) {
   editForm.is_active = Boolean(item.is_active);
 }
 
-async function refreshList() {
+async function refreshList(page = 1) {
+  const targetPage = Math.max(1, Number(page || 1));
   try {
-    const result = await loadAdminActivitiesList();
+    const result = await loadAdminActivitiesList(targetPage);
+    if (Array.isArray(result?.results)) {
+      activities.value = result.results;
+      adminPagination.value = {
+        count: Number(result.count || 0),
+        page: targetPage,
+        total_pages: Math.max(
+          1,
+          Math.ceil(Number(result.count || 0) / 4)
+        ),
+        next: result.next || null,
+        previous: result.previous || null,
+      };
+      if (
+        !activities.value.length
+        && adminPagination.value.page > 1
+        && adminPagination.value.count > 0
+      ) {
+        await refreshList(adminPagination.value.page - 1);
+      }
+      return;
+    }
+
     activities.value = Array.isArray(result) ? result : [];
-  } catch {
+    adminPagination.value = {
+      count: activities.value.length,
+      page: 1,
+      total_pages: 1,
+      next: null,
+      previous: null,
+    };
+  } catch (error) {
+    if (error?.response?.status === 404 && targetPage > 1) {
+      await refreshList(targetPage - 1);
+      return;
+    }
     // Error banner is handled in shared state.
   }
 }
@@ -104,7 +150,7 @@ async function handleCreate() {
   try {
     const payload = parseActivityPayload(createForm);
     await createAdminActivityEntry(payload);
-    await refreshList();
+    await refreshList(adminPagination.value.page);
     await refreshAudit();
     createForm.title = "";
     createForm.description = "";
@@ -127,7 +173,7 @@ async function saveEdit(itemId) {
     const payload = parseActivityPayload(editForm);
     await updateAdminActivityEntry(itemId, payload);
     editingId.value = null;
-    await refreshList();
+    await refreshList(adminPagination.value.page);
     await refreshAudit();
   } catch {
     // Error banner is handled in shared state.
@@ -137,7 +183,7 @@ async function saveEdit(itemId) {
 async function removeItem(itemId) {
   try {
     await deleteAdminActivityEntry(itemId);
-    await refreshList();
+    await refreshList(adminPagination.value.page);
     await refreshAudit();
   } catch {
     // Error banner is handled in shared state.
@@ -158,7 +204,7 @@ async function uploadCsv() {
     const result = await importAdminActivitiesFromCsv(csvFile.value);
     importSummary.value = result;
     csvFile.value = null;
-    await refreshList();
+    await refreshList(adminPagination.value.page);
     await refreshAudit();
   } catch {
     // Error banner is handled in shared state.
@@ -166,9 +212,16 @@ async function uploadCsv() {
 }
 
 onMounted(async () => {
-  await refreshList();
+  await refreshList(1);
   await refreshAudit();
 });
+
+async function handlePageChange(page) {
+  if (state.busy.admin) {
+    return;
+  }
+  await refreshList(page);
+}
 </script>
 
 <template>
@@ -360,6 +413,24 @@ onMounted(async () => {
         </template>
       </li>
     </ul>
+
+    <div v-if="activities.length && hasPagination" class="history-pagination">
+      <button
+        class="ghost-button"
+        :disabled="state.busy.admin || adminPagination.page <= 1"
+        @click="handlePageChange(adminPagination.page - 1)"
+      >
+        Previous
+      </button>
+      <strong>Page {{ adminPagination.page }} / {{ adminPagination.total_pages }}</strong>
+      <button
+        class="ghost-button"
+        :disabled="state.busy.admin || adminPagination.page >= adminPagination.total_pages"
+        @click="handlePageChange(adminPagination.page + 1)"
+      >
+        Next
+      </button>
+    </div>
 
     <section class="admin-form-card audit-log-card">
       <h3>Admin audit trail</h3>

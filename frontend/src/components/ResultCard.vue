@@ -1,11 +1,9 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 
-import { getBudgetOption } from "../budgetOptions";
 import CalendarModal from "./CalendarModal.vue";
 import { getCategoryOption } from "../categoryOptions";
-import { getMoodOption } from "../moodOptions";
 import { getSocialOption } from "../socialOptions";
 import {
   acceptCurrentSuggestion,
@@ -32,6 +30,8 @@ const acceptButtonDisabled = computed(
   () => actionsDisabled.value || Boolean(state.suggestion?.is_accepted)
 );
 const calendarOpen = ref(false);
+const popResultCard = ref(false);
+let popTimerId = null;
 
 const TITLE_EMOJI_MAP = {
   FOOD: "🍽",
@@ -50,42 +50,6 @@ function stripLeadingEmoji(label) {
     .trim();
 }
 
-function getTimeDescriptor(minutes) {
-  if (!minutes) {
-    return "open-ended";
-  }
-
-  if (minutes <= 20) {
-    return "short";
-  }
-
-  if (minutes <= 60) {
-    return "manageable";
-  }
-
-  return "longer";
-}
-
-const whyThisActivity = computed(() => {
-  if (!state.suggestion) {
-    return "";
-  }
-
-  const mood = state.constraints.mood
-    ? stripLeadingEmoji(getMoodOption(state.constraints.mood).label).toLowerCase()
-    : "current";
-  const social = state.constraints.social_preference
-    ? stripLeadingEmoji(getSocialOption(state.constraints.social_preference).label).toLowerCase()
-    : "your preference";
-  const budget = state.constraints.budget_preference
-    ? getBudgetOption(state.constraints.budget_preference).label.toLowerCase()
-    : "your budget";
-  const time = getTimeDescriptor(Number(state.constraints.time_minutes || 0));
-
-  return `Based on your ${mood} mood, ${time} available time, ${budget} range, and ${social} preference.`;
-});
-
-const explainability = computed(() => state.suggestion?.explainability || null);
 const resultTitle = computed(() => {
   if (!state.suggestion) {
     return "";
@@ -94,20 +58,6 @@ const resultTitle = computed(() => {
   const emoji = TITLE_EMOJI_MAP[category] || "✨";
   return `${emoji} ${state.suggestion.activity.title}`;
 });
-
-const energyScoreLabel = computed(() => {
-  const score = explainability.value?.soft_preferences?.energy?.score ?? 0;
-  return `+${score}/2`;
-});
-
-const socialScoreLabel = computed(() => {
-  const score = explainability.value?.soft_preferences?.social?.score ?? 0;
-  return `+${score}/1`;
-});
-
-function explainabilityStatus(value) {
-  return value ? "Matched" : "Not matched";
-}
 
 async function handleAccept() {
   try {
@@ -163,6 +113,33 @@ function formatBudgetRange(activity) {
 function formatSocialLabel(socialType) {
   return stripLeadingEmoji(getSocialOption(socialType).label);
 }
+
+watch(
+  () =>
+    state.suggestion
+      ? `${state.suggestion.id}-${state.suggestion.is_accepted ? "accepted" : "review"}`
+      : "",
+  (current, previous) => {
+    if (!current || current === previous) {
+      return;
+    }
+    popResultCard.value = true;
+    if (popTimerId) {
+      window.clearTimeout(popTimerId);
+    }
+    popTimerId = window.setTimeout(() => {
+      popResultCard.value = false;
+      popTimerId = null;
+    }, 520);
+  }
+);
+
+onBeforeUnmount(() => {
+  if (popTimerId) {
+    window.clearTimeout(popTimerId);
+    popTimerId = null;
+  }
+});
 </script>
 
 <template>
@@ -184,7 +161,10 @@ function formatSocialLabel(socialType) {
       >
         <div
           class="result-card suggestion-sticker"
-          :class="{ 'accepted-card': state.suggestion.is_accepted }"
+          :class="{
+            'accepted-card': state.suggestion.is_accepted,
+            'fresh-pop': popResultCard,
+          }"
         >
           <div class="result-headline">
             <p class="result-category">
@@ -200,98 +180,12 @@ function formatSocialLabel(socialType) {
 
           <h3>{{ resultTitle }}</h3>
           <p class="result-copy">{{ state.suggestion.activity.description }}</p>
-          <div class="why-card">
-            <strong>Why this activity?</strong>
-            <p>{{ whyThisActivity }}</p>
-          </div>
-
-          <details v-if="explainability" class="explainability-card">
-            <summary>Why this suggestion</summary>
-
-            <div class="explainability-block">
-              <p class="explainability-title">Hard constraints</p>
-              <ul>
-                <li>
-                  Time:
-                  {{ explainabilityStatus(explainability.hard_constraints.time.matched) }}
-                  (need ≤ {{ explainability.hard_constraints.time.required_minutes }} min,
-                  activity min {{ explainability.hard_constraints.time.activity_min_minutes }} min)
-                </li>
-                <li>
-                  Budget:
-                  {{ explainabilityStatus(explainability.hard_constraints.budget.matched) }}
-                  (budget ≤ £{{ explainability.hard_constraints.budget.required_budget }},
-                  activity max £{{ explainability.hard_constraints.budget.activity_max_budget }})
-                </li>
-                <li>
-                  Category:
-                  {{
-                    explainability.hard_constraints.excluded_category.relaxed
-                      ? "Relaxed once"
-                      : explainabilityStatus(
-                        explainability.hard_constraints.excluded_category.matched
-                      )
-                  }}
-                  (activity: {{ explainability.hard_constraints.excluded_category.activity_category }})
-                </li>
-              </ul>
-            </div>
-
-            <div class="explainability-block">
-              <p class="explainability-title">Soft preference score</p>
-              <ul>
-                <li>
-                  Energy:
-                  {{ explainabilityStatus(explainability.soft_preferences.energy.matched) }}
-                  {{ energyScoreLabel }}
-                </li>
-                <li>
-                  Social:
-                  {{ explainabilityStatus(explainability.soft_preferences.social.matched) }}
-                  {{ socialScoreLabel }}
-                </li>
-                <li>
-                  Total score:
-                  {{ explainability.soft_preferences.total_score }}
-                  / {{ explainability.soft_preferences.max_score }}
-                </li>
-              </ul>
-            </div>
-
-            <div class="explainability-block">
-              <p class="explainability-title">System decisions</p>
-              <ul>
-                <li>
-                  Category fallback:
-                  {{
-                    explainability.system.fallback_applied
-                      ? "Applied"
-                      : "Not applied"
-                  }}
-                </li>
-                <li>
-                  Cooldown relaxed:
-                  {{
-                    explainability.system.cooldown_relaxed
-                      ? "Applied once"
-                      : "Not applied"
-                  }}
-                </li>
-              </ul>
-            </div>
-          </details>
 
           <p
             v-if="state.suggestion.fallback_applied && state.suggestion.fallback_message"
             class="inline-hint"
           >
             {{ state.suggestion.fallback_message }}
-          </p>
-          <p
-            v-if="state.suggestion.cooldown_relaxed && state.suggestion.cooldown_message"
-            class="inline-hint"
-          >
-            {{ state.suggestion.cooldown_message }}
           </p>
 
           <dl class="metrics">
@@ -312,17 +206,27 @@ function formatSocialLabel(socialType) {
             </div>
           </dl>
 
-          <div v-if="!state.suggestion.is_accepted" class="button-row">
-            <button
-              class="ghost-button"
-              :disabled="rerollButtonDisabled"
-              @click="handleReroll"
-            >
-              {{ state.busy.generate ? "Generating..." : "🎲 Another one" }}
-            </button>
+          <div v-if="!state.suggestion.is_accepted" class="result-actions-stack">
+            <div class="result-secondary-row">
+              <button
+                class="ghost-button result-secondary-button"
+                :disabled="rerollButtonDisabled"
+                @click="handleReroll"
+              >
+                {{ state.busy.generate ? "Generating..." : "🎲 Another one" }}
+              </button>
+
+              <button
+                class="ghost-button result-secondary-button"
+                :disabled="actionsDisabled"
+                @click="handleSave"
+              >
+                {{ state.busy.saved ? "Saving..." : "💾 Save" }}
+              </button>
+            </div>
 
             <button
-              class="primary-button"
+              class="primary-button result-accept-button"
               :disabled="acceptButtonDisabled"
               @click="handleAccept"
             >
@@ -330,19 +234,11 @@ function formatSocialLabel(socialType) {
             </button>
 
             <button
-              class="ghost-button"
-              :disabled="actionsDisabled"
-              @click="handleSave"
-            >
-              {{ state.busy.saved ? "Saving..." : "💾 Save" }}
-            </button>
-
-            <button
-              class="ghost-button"
+              class="result-calendar-link"
               :disabled="actionsDisabled"
               @click="handleOpenCalendar"
             >
-              📅 Add to Calendar
+              📅 Add to calendar
             </button>
           </div>
 

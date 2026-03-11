@@ -1,17 +1,18 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { RouterLink, RouterView, useRouter } from "vue-router";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 
+import diceIcon from "../assets/dice-random.svg";
 import { getBudgetOption } from "../budgetOptions";
 import { getMoodOption } from "../moodOptions";
 import { getSocialOption } from "../socialOptions";
 import { logout, state, toggleUiPreference } from "../state";
 
 const router = useRouter();
-const a11yOpen = ref(false);
-const profileOpen = ref(false);
-const a11yRef = ref(null);
-const profileRef = ref(null);
+const route = useRoute();
+const settingsOpen = ref(false);
+const settingsA11yOpen = ref(false);
+const settingsRef = ref(null);
 
 const energySummary = computed(() => {
   if (!state.constraints.mood) {
@@ -52,37 +53,32 @@ const userInitial = computed(() => {
 
 function handleLogout() {
   logout();
-  profileOpen.value = false;
+  settingsOpen.value = false;
+  settingsA11yOpen.value = false;
   router.push("/login");
 }
 
 function closeMenus() {
-  a11yOpen.value = false;
-  profileOpen.value = false;
-}
-
-function toggleA11yMenu() {
-  a11yOpen.value = !a11yOpen.value;
-  if (a11yOpen.value) {
-    profileOpen.value = false;
-  }
-}
-
-function toggleProfileMenu() {
-  profileOpen.value = !profileOpen.value;
-  if (profileOpen.value) {
-    a11yOpen.value = false;
-  }
+  settingsOpen.value = false;
+  settingsA11yOpen.value = false;
 }
 
 function handleDocumentClick(event) {
   const target = event.target;
-  if (a11yRef.value && !a11yRef.value.contains(target)) {
-    a11yOpen.value = false;
+  if (settingsRef.value && !settingsRef.value.contains(target)) {
+    settingsOpen.value = false;
   }
-  if (profileRef.value && !profileRef.value.contains(target)) {
-    profileOpen.value = false;
+}
+
+function toggleSettingsMenu() {
+  settingsOpen.value = !settingsOpen.value;
+  if (!settingsOpen.value) {
+    settingsA11yOpen.value = false;
   }
+}
+
+function toggleSettingsA11y() {
+  settingsA11yOpen.value = !settingsA11yOpen.value;
 }
 
 function handleEscape(event) {
@@ -96,6 +92,13 @@ onMounted(() => {
   document.addEventListener("keydown", handleEscape);
 });
 
+watch(
+  () => route.fullPath,
+  () => {
+    closeMenus();
+  }
+);
+
 onBeforeUnmount(() => {
   document.removeEventListener("mousedown", handleDocumentClick);
   document.removeEventListener("keydown", handleEscape);
@@ -104,11 +107,23 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="dashboard-layout">
+    <div class="scene-layer" aria-hidden="true">
+      <span class="scene-blob blob-a" />
+      <span class="scene-blob blob-b" />
+      <span class="scene-blob blob-c" />
+      <span class="scene-doodle doodle-a">✨</span>
+      <span class="scene-doodle doodle-b">🎲</span>
+      <span class="scene-doodle doodle-c">🍃</span>
+    </div>
+
     <header class="dashboard-header">
-      <div class="dashboard-header-copy">
-        <p class="eyebrow">Decision Support</p>
-        <h1>Random Activity</h1>
-        <p class="dashboard-subcopy">Set limits, get one fun next move.</p>
+      <div class="dashboard-brand">
+        <img :src="diceIcon" alt="" class="dashboard-brand-icon" />
+        <div class="dashboard-header-copy">
+          <p class="eyebrow">Decision Support</p>
+          <h1>Random Activity</h1>
+          <p class="dashboard-subcopy">Set your limits and discover something fun.</p>
+        </div>
       </div>
 
       <div class="dashboard-header-side">
@@ -118,74 +133,73 @@ onBeforeUnmount(() => {
           <RouterLink to="/saved">Saved</RouterLink>
         </nav>
 
-        <div ref="a11yRef" class="a11y-menu">
+        <div ref="settingsRef" class="profile-menu settings-menu">
           <button
             type="button"
-            class="ghost-button a11y-trigger"
-            :aria-expanded="a11yOpen"
-            aria-controls="a11y-dropdown"
-            @click="toggleA11yMenu"
-          >
-            Accessibility
-          </button>
-          <div
-            v-if="a11yOpen"
-            id="a11y-dropdown"
-            class="a11y-dropdown"
-            role="group"
-            aria-label="Accessibility settings"
-          >
-            <button
-              type="button"
-              class="a11y-switch"
-              role="switch"
-              :aria-checked="state.uiPrefs.reduceMotion"
-              @click="toggleUiPreference('reduceMotion')"
-            >
-              <span>Reduce motion</span>
-              <span class="switch-pill" :class="{ active: state.uiPrefs.reduceMotion }" />
-            </button>
-            <button
-              type="button"
-              class="a11y-switch"
-              role="switch"
-              :aria-checked="state.uiPrefs.largerText"
-              @click="toggleUiPreference('largerText')"
-            >
-              <span>Larger text</span>
-              <span class="switch-pill" :class="{ active: state.uiPrefs.largerText }" />
-            </button>
-            <button
-              type="button"
-              class="a11y-switch"
-              role="switch"
-              :aria-checked="state.uiPrefs.highContrast"
-              @click="toggleUiPreference('highContrast')"
-            >
-              <span>High contrast</span>
-              <span class="switch-pill" :class="{ active: state.uiPrefs.highContrast }" />
-            </button>
-          </div>
-        </div>
-
-        <div ref="profileRef" class="profile-menu">
-          <button
-            type="button"
-            class="profile-trigger"
-            :aria-expanded="profileOpen"
-            aria-controls="profile-dropdown"
-            @click="toggleProfileMenu"
+            class="profile-trigger settings-trigger"
+            :aria-expanded="settingsOpen"
+            aria-controls="settings-dropdown"
+            aria-label="Open settings"
+            @click="toggleSettingsMenu"
           >
             <span class="avatar-circle">{{ userInitial }}</span>
-            <span class="profile-name">{{ state.user?.username || "Signed-in user" }}</span>
           </button>
           <div
-            v-if="profileOpen"
-            id="profile-dropdown"
-            class="profile-dropdown"
+            v-if="settingsOpen"
+            id="settings-dropdown"
+            class="profile-dropdown settings-dropdown"
+            role="menu"
+            aria-label="Account settings"
           >
-            <button class="ghost-button profile-signout" @click="handleLogout">
-              Sign out
+            <p class="settings-row settings-account-row">Account ({{ state.user?.username || "admin" }})</p>
+            <button
+              type="button"
+              class="settings-row settings-accessibility-row"
+              :aria-expanded="settingsA11yOpen"
+              aria-controls="settings-a11y-panel"
+              @click="toggleSettingsA11y"
+            >
+              <span>Accessibility</span>
+              <span class="settings-chevron" :class="{ open: settingsA11yOpen }">⌄</span>
+            </button>
+            <div
+              v-if="settingsA11yOpen"
+              id="settings-a11y-panel"
+              class="settings-a11y-panel"
+            >
+              <button
+                type="button"
+                class="a11y-switch settings-switch"
+                role="switch"
+                :aria-checked="state.uiPrefs.reduceMotion"
+                @click="toggleUiPreference('reduceMotion')"
+              >
+                <span>Reduce motion</span>
+                <span class="switch-pill" :class="{ active: state.uiPrefs.reduceMotion }" />
+              </button>
+              <button
+                type="button"
+                class="a11y-switch settings-switch"
+                role="switch"
+                :aria-checked="state.uiPrefs.largerText"
+                @click="toggleUiPreference('largerText')"
+              >
+                <span>Larger text</span>
+                <span class="switch-pill" :class="{ active: state.uiPrefs.largerText }" />
+              </button>
+              <button
+                type="button"
+                class="a11y-switch settings-switch"
+                role="switch"
+                :aria-checked="state.uiPrefs.highContrast"
+                @click="toggleUiPreference('highContrast')"
+              >
+                <span>High contrast</span>
+                <span class="switch-pill" :class="{ active: state.uiPrefs.highContrast }" />
+              </button>
+            </div>
+            <button class="settings-row settings-logout-row" @click="handleLogout">
+              Log out
             </button>
           </div>
         </div>
@@ -193,7 +207,7 @@ onBeforeUnmount(() => {
     </header>
 
     <section class="filter-strip">
-      <span class="filter-label">Current filters</span>
+      <span class="filter-label">Your choices</span>
       <div class="filter-pills">
         <div class="filter-pill icon-pill">
           <span>{{ energySummary }}</span>

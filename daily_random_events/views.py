@@ -285,21 +285,21 @@ def _pending_activity_log_for_user(user):
 
 
 class ActivityLogPagination(PageNumberPagination):
-    page_size = 10
-    page_size_query_param = "page_size"
-    max_page_size = 50
+    page_size = 4
 
 
 class SavedSuggestionPagination(PageNumberPagination):
-    page_size = 10
-    page_size_query_param = "page_size"
-    max_page_size = 50
+    page_size = 4
 
 
 class AdminAuditLogPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
     max_page_size = 100
+
+
+class AdminActivityPagination(PageNumberPagination):
+    page_size = 4
 
 
 class RegisterView(APIView):
@@ -335,6 +335,14 @@ class LoginView(APIView):
                 "user": UserSummarySerializer(user).data,
             }
         )
+
+
+class HealthView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, _request):
+        return Response({"status": "ok"})
 
 
 class MetadataView(APIView):
@@ -802,6 +810,7 @@ class AdminActivityListCreateView(generics.ListCreateAPIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [permissions.IsAdminUser]
     serializer_class = ActivitySerializer
+    pagination_class = AdminActivityPagination
     queryset = Activity.objects.all().order_by("title")
 
 

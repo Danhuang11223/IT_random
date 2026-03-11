@@ -1,6 +1,8 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 
+import celebrateGif from "../assets/celebrate.gif";
+import diceIcon from "../assets/dice-random.svg";
 import { getBudgetOption, getBudgetOptions } from "../budgetOptions";
 import { EXCLUDE_CATEGORY_GROUPS } from "../categoryOptions";
 import { getMoodOption, sortMoodValues } from "../moodOptions";
@@ -39,6 +41,10 @@ const wizardStepIndex = ref(0);
 const wizardDirection = ref("forward");
 const wizardError = ref("");
 const timeMode = ref("quick");
+const isRollingDice = ref(false);
+const celebrateVisible = ref(false);
+const touchGesture = ref(null);
+let celebrateTimerId = null;
 
 const availableMoodOptions = computed(() =>
   sortMoodValues(state.metadata.moods || []).map((mood) => getMoodOption(mood))
@@ -52,7 +58,7 @@ const budgetOptions = getBudgetOptions();
 const excludeCategoryOptions = computed(() => EXCLUDE_CATEGORY_GROUPS);
 const currentWizardStep = computed(() => wizardSteps[wizardStepIndex.value]);
 const wizardProgress = computed(
-  () => `${wizardStepIndex.value + 1} / ${wizardSteps.length}`
+  () => `${wizardStepIndex.value + 1} of ${wizardSteps.length}`
 );
 const stepTransitionName = computed(() =>
   wizardDirection.value === "forward" ? "wizard-slide-left" : "wizard-slide-right"
@@ -101,6 +107,68 @@ function jumpToStep(index) {
 
 function goPreviousStep() {
   setWizardStep(wizardStepIndex.value - 1, "backward");
+}
+
+function handleSwipeLeft() {
+  const stepKey = currentWizardStep.value.key;
+  if (!["mood", "time", "budget", "social"].includes(stepKey)) {
+    return;
+  }
+  if (!isStepReady(stepKey)) {
+    wizardError.value = stepErrorMessage(stepKey);
+    return;
+  }
+  goNextStep();
+}
+
+function handleSwipeRight() {
+  if (currentWizardStep.value.key === "result") {
+    setWizardStep(STEP_INDEX.surprise, "backward");
+    return;
+  }
+  if (wizardStepIndex.value > 0) {
+    goPreviousStep();
+  }
+}
+
+function handleCardTouchStart(event) {
+  if (!event.touches || event.touches.length !== 1) {
+    touchGesture.value = null;
+    return;
+  }
+  const touch = event.touches[0];
+  touchGesture.value = {
+    x: touch.clientX,
+    y: touch.clientY,
+    time: Date.now(),
+  };
+}
+
+function handleCardTouchEnd(event) {
+  if (!touchGesture.value || !event.changedTouches || !event.changedTouches.length) {
+    touchGesture.value = null;
+    return;
+  }
+  const endTouch = event.changedTouches[0];
+  const deltaX = endTouch.clientX - touchGesture.value.x;
+  const deltaY = endTouch.clientY - touchGesture.value.y;
+  const durationMs = Date.now() - touchGesture.value.time;
+  touchGesture.value = null;
+
+  if (durationMs > 700) {
+    return;
+  }
+  if (Math.abs(deltaX) < 56) {
+    return;
+  }
+  if (Math.abs(deltaX) < Math.abs(deltaY) * 1.2) {
+    return;
+  }
+  if (deltaX < 0) {
+    handleSwipeLeft();
+  } else {
+    handleSwipeRight();
+  }
 }
 
 function isValidTimeSelection() {
@@ -201,12 +269,34 @@ function selectCustomTime() {
   }
 }
 
+function submitCustomTime() {
+  if (currentWizardStep.value.key !== "time" || timeMode.value !== "other") {
+    return;
+  }
+  goNextStep();
+}
+
 async function handleGenerateFromSurprise() {
+  if (state.busy.generate || isRollingDice.value) {
+    return;
+  }
+
+  isRollingDice.value = true;
   try {
     await generateSuggestion();
+    celebrateVisible.value = true;
+    if (celebrateTimerId) {
+      window.clearTimeout(celebrateTimerId);
+    }
+    celebrateTimerId = window.setTimeout(() => {
+      celebrateVisible.value = false;
+      celebrateTimerId = null;
+    }, 1600);
     setWizardStep(STEP_INDEX.result, "forward");
   } catch {
     // Error state is handled in shared state.
+  } finally {
+    isRollingDice.value = false;
   }
 }
 
@@ -244,13 +334,26 @@ watch(
     }
   }
 );
+
+onBeforeUnmount(() => {
+  if (celebrateTimerId) {
+    window.clearTimeout(celebrateTimerId);
+    celebrateTimerId = null;
+  }
+});
 </script>
 
 <template>
   <section class="panel generator-form-card flow-panel">
+    <Transition name="celebrate-pop">
+      <div v-if="celebrateVisible" class="celebrate-overlay" aria-hidden="true">
+        <img :src="celebrateGif" alt="" />
+      </div>
+    </Transition>
+
     <div class="panel-heading">
-      <h2>Random Activity</h2>
-      <p>Step through your choices, then reveal one suggestion.</p>
+      <h2>Let's pick something fun</h2>
+      <p>Answer a few quick questions,<br>then let the generator surprise you.</p>
     </div>
 
     <p v-if="state.formErrors.constraints._form" class="form-inline-error">
@@ -272,12 +375,18 @@ watch(
       </div>
     </div>
 
-    <Transition :name="stepTransitionName" mode="out-in">
-      <article :key="currentWizardStep.key" class="wizard-card">
+    <div class="wizard-stage">
+      <Transition :name="stepTransitionName" mode="out-in">
+        <article
+          :key="currentWizardStep.key"
+          class="wizard-card"
+          @touchstart.passive="handleCardTouchStart"
+          @touchend.passive="handleCardTouchEnd"
+        >
         <template v-if="currentWizardStep.key === 'mood'">
           <p class="section-kicker">1. Mood</p>
           <h3 class="wizard-question">How are you feeling today?</h3>
-          <p class="wizard-note">Pick the vibe first. We tune the suggestion to this.</p>
+          <p class="wizard-note">Tell us the vibe.<br>We will match the activity to it.</p>
 
           <div class="choice-chip-grid">
             <button
@@ -297,7 +406,7 @@ watch(
         <template v-else-if="currentWizardStep.key === 'time'">
           <p class="section-kicker">2. Time</p>
           <h3 class="wizard-question">How much time do you have?</h3>
-          <p class="wizard-note">Choose a quick option or enter your own value.</p>
+          <p class="wizard-note">Pick a quick option<br>or enter your own time.</p>
 
           <div class="time-choice-list">
             <button
@@ -316,7 +425,7 @@ watch(
               :class="{ active: timeMode === 'other' }"
               @click="selectCustomTime"
             >
-              Other...
+              Custom time
             </button>
           </div>
 
@@ -329,18 +438,26 @@ watch(
             step="5"
             placeholder="e.g. 45"
             class="time-other-input"
+            @keydown.enter.prevent="submitCustomTime"
           />
 
           <div class="wizard-nav">
             <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
-            <button type="button" class="primary-button" @click="goNextStep">Continue</button>
+            <button
+              v-if="timeMode === 'other'"
+              type="button"
+              class="primary-button"
+              @click="submitCustomTime"
+            >
+              Continue
+            </button>
           </div>
         </template>
 
         <template v-else-if="currentWizardStep.key === 'budget'">
           <p class="section-kicker">3. Budget</p>
           <h3 class="wizard-question">What budget feels right?</h3>
-          <p class="wizard-note">Use a tier instead of raw numbers for faster decisions.</p>
+          <p class="wizard-note">Pick a budget that feels comfortable.</p>
 
           <div class="choice-chip-grid">
             <button
@@ -363,8 +480,8 @@ watch(
 
         <template v-else-if="currentWizardStep.key === 'social'">
           <p class="section-kicker">4. Social</p>
-          <h3 class="wizard-question">Who is joining?</h3>
-          <p class="wizard-note">We prioritize activities that fit this social mode.</p>
+          <h3 class="wizard-question">Who is joining today?</h3>
+          <p class="wizard-note">We will suggest activities that fit this.</p>
 
           <div class="choice-chip-grid">
             <button
@@ -389,7 +506,7 @@ watch(
           <p class="section-kicker">5. Surprise</p>
           <h3 class="wizard-question">Ready for a surprise?</h3>
           <p class="wizard-note">
-            We will pick one activity based on your choices. You can always reroll later.
+            We will pick an activity based on your choices. Not happy with it? You can reroll later.
           </p>
 
           <div class="wizard-summary">
@@ -439,13 +556,28 @@ watch(
             You already have one accepted activity in history. You can still generate another.
           </p>
 
-          <button
-            class="primary-button generate-button wizard-surprise-button"
-            :disabled="!isLoggedIn || state.busy.generate"
-            @click="handleGenerateFromSurprise"
+          <article
+            class="surprise-action-card"
+            :class="{ rolling: isRollingDice || state.busy.generate }"
           >
-            {{ state.busy.generate ? "Generating activity..." : "✨ Surprise me" }}
-          </button>
+            <div class="surprise-dice-wrap">
+              <span class="surprise-dice-ring" />
+              <img class="surprise-dice-icon" :src="diceIcon" alt="" />
+            </div>
+
+            <div class="surprise-action-copy">
+              <strong>Roll a random pick</strong>
+              <p>One tap, one fresh idea. If it is not right, reroll in Result.</p>
+            </div>
+
+            <button
+              class="primary-button generate-button wizard-surprise-button"
+              :disabled="!isLoggedIn || state.busy.generate || isRollingDice"
+              @click="handleGenerateFromSurprise"
+            >
+              {{ state.busy.generate || isRollingDice ? "Rolling the dice..." : "✨ Surprise me" }}
+            </button>
+          </article>
 
           <div class="wizard-nav">
             <button type="button" class="ghost-button" @click="goPreviousStep">Back</button>
@@ -455,7 +587,7 @@ watch(
         <template v-else>
           <p class="section-kicker">6. Result</p>
           <h3 class="wizard-question">Your suggestion</h3>
-          <p class="wizard-note">Review it, then accept, save, or try another one.</p>
+          <p class="wizard-note">Take a look. You can accept it, save it, or try another one.</p>
 
           <ResultCard embedded />
 
@@ -469,8 +601,9 @@ watch(
             </button>
           </div>
         </template>
-      </article>
-    </Transition>
+        </article>
+      </Transition>
+    </div>
 
     <p v-if="wizardError" class="form-inline-error">{{ wizardError }}</p>
   </section>
