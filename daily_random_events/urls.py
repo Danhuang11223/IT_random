@@ -16,6 +16,9 @@ from .views import (
     RerollView,
     SavedSuggestionDetailView,
     SavedSuggestionListCreateView,
+    PasswordResetDemoView,
+
+    PasswordResetConfirmView,
 )
 
 app_name = "daily_random_events"
@@ -24,6 +27,10 @@ urlpatterns = [
     path("health/", HealthView.as_view(), name="health"),
     path("auth/register/", RegisterView.as_view(), name="register"),
     path("auth/login/", LoginView.as_view(), name="login"),
+    path("auth/password-reset/", PasswordResetDemoView.as_view(), name="password-reset-demo"),
+    
+    path("auth/password-reset-confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
+    
     path("metadata/", MetadataView.as_view(), name="metadata"),
     path("generate/", GenerateView.as_view(), name="generate"),
     path("generate/<int:request_id>/reroll/", RerollView.as_view(), name="reroll"),

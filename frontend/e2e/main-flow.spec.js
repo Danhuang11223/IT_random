@@ -14,6 +14,7 @@ test("login -> generate -> save -> history search/sort", async ({ page }) => {
   await page.getByRole("button", { name: /^30 min$/i }).click();
   await page.getByRole("button", { name: /Medium/i }).click();
   await page.getByRole("button", { name: /Just me/i }).click();
+  await page.getByRole("button", { name: /Looks good/i }).click();
   await page.getByRole("button", { name: /Surprise me/i }).click();
 
   await expect(page.getByRole("heading", { name: /Your suggestion/i })).toBeVisible();

@@ -216,10 +216,10 @@ onBeforeUnmount(() => {
           <span>{{ timeSummary }}</span>
         </div>
         <div class="filter-pill icon-pill">
-          <span>{{ socialSummary }}</span>
+          <span>{{ budgetSummary }}</span>
         </div>
         <div class="filter-pill icon-pill">
-          <span>{{ budgetSummary }}</span>
+          <span>{{ socialSummary }}</span>
         </div>
       </div>
     </section>

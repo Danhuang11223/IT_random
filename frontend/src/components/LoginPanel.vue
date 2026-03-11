@@ -67,6 +67,11 @@ async function submit() {
         </small>
       </label>
 
+      <div class="forgot-password-container">
+        <router-link to="/forgot-password" class="forgot-password-link">
+          Forget your password?
+        </router-link>
+      </div>
       <button class="primary-button roll-day-button" :disabled="state.busy.auth">
         <span class="roll-day-content">
           <img
@@ -80,3 +85,24 @@ async function submit() {
     </form>
   </section>
 </template>
+
+<style scoped>
+.forgot-password-container {
+  text-align: right;
+  margin-top: -8px;
+  margin-bottom: 8px;
+}
+
+.forgot-password-link {
+  font-size: 0.85rem;
+  color: #6b7280; 
+  text-decoration: none; 
+  transition: all 0.2s ease; 
+}
+
+
+.forgot-password-link:hover {
+  color: #111827; 
+  text-decoration: underline; 
+}
+</style>
