@@ -24,7 +24,10 @@ onBeforeUnmount(() => {
 const disableScaleForMobileAuth = computed(
   () =>
     isMobileViewport.value &&
-    (route.name === "login" || route.name === "register")
+    (route.name === "login" ||
+      route.name === "register" ||
+      route.name === "forgotPassword" ||
+      route.name === "resetPasswordConfirm")
 );
 </script>
 

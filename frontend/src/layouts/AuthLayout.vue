@@ -27,7 +27,10 @@ onBeforeUnmount(() => {
 const mobileAuthCompact = computed(
   () =>
     isMobileViewport.value &&
-    (route.name === "login" || route.name === "register")
+    (route.name === "login" ||
+      route.name === "register" ||
+      route.name === "forgotPassword" ||
+      route.name === "resetPasswordConfirm")
 );
 </script>
 
