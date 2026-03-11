@@ -77,22 +77,30 @@ async function submit() {
       key="mobile-intro"
       class="panel auth-panel wide-panel auth-form-card mobile-login-intro"
     >
-      <div class="mobile-intro-preview">
-        <div class="mobile-intro-art-wrap">
-          <img :src="thinkingBroIllustration" alt="" class="mobile-intro-art" />
-          <span class="mobile-intro-dice-pulse" aria-hidden="true">
-            <img :src="diceIcon" alt="" />
-          </span>
+      <button
+        type="button"
+        class="mobile-intro-stage"
+        aria-label="Open sign in form"
+        @click="openSignInForm"
+      >
+        <div class="mobile-intro-preview">
+          <div class="mobile-intro-art-wrap">
+            <img :src="thinkingBroIllustration" alt="" class="mobile-intro-art" />
+          </div>
+          <div class="mobile-intro-copy">
+            <p class="mobile-intro-kicker">Generator Preview</p>
+            <h2>Random Activity</h2>
+            <p>Roll one idea based on mood, time, and budget.</p>
+          </div>
         </div>
-        <div class="mobile-intro-copy">
-          <p class="mobile-intro-kicker">Generator Preview</p>
-          <h2>Random Activity</h2>
-          <p>Roll one idea based on mood, time, and budget.</p>
-        </div>
-      </div>
 
-      <button type="button" class="primary-button mobile-intro-cta" @click="openSignInForm">
-        Continue to Sign in
+        <div class="mobile-intro-chip-row" aria-hidden="true">
+          <span class="mobile-intro-chip">Generate activities</span>
+          <span class="mobile-intro-chip">Based on mood &amp; time</span>
+          <span class="mobile-intro-chip">Track your progress</span>
+        </div>
+
+        <p class="mobile-intro-hint">Tap this card to sign in</p>
       </button>
     </section>
 
@@ -156,8 +164,26 @@ async function submit() {
 
 <style scoped>
 .mobile-login-intro {
+  padding: 0;
+  overflow: hidden;
+}
+
+.mobile-intro-stage {
+  width: 100%;
+  border: 0;
+  background: transparent;
   display: grid;
-  gap: 16px;
+  gap: 14px;
+  text-align: left;
+  padding: 14px;
+  cursor: pointer;
+  border-radius: inherit;
+  transition: transform 0.2s ease;
+  animation: intro-card-breathe 1.9s ease-in-out infinite;
+}
+
+.mobile-intro-stage:active {
+  transform: scale(0.985);
 }
 
 .mobile-intro-preview {
@@ -173,6 +199,8 @@ async function submit() {
   border: 1px solid rgba(31, 47, 62, 0.14);
   background: linear-gradient(155deg, #f9fffd, #f2f9ff);
   padding: 10px;
+  box-shadow: 0 12px 24px rgba(20, 52, 66, 0.14);
+  animation: intro-art-float 1.8s ease-in-out infinite;
 }
 
 .mobile-intro-art {
@@ -180,26 +208,6 @@ async function submit() {
   height: auto;
   object-fit: contain;
   display: block;
-}
-
-.mobile-intro-dice-pulse {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(31, 47, 62, 0.16);
-  box-shadow: 0 8px 18px rgba(20, 52, 66, 0.16);
-  animation: dice-pulse 1.5s ease-in-out infinite;
-}
-
-.mobile-intro-dice-pulse img {
-  width: 20px;
-  height: 20px;
 }
 
 .mobile-intro-copy {
@@ -227,8 +235,41 @@ async function submit() {
   font-size: 0.94rem;
 }
 
-.mobile-intro-cta {
-  min-height: 52px;
+.mobile-intro-chip-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobile-intro-chip {
+  border-radius: 999px;
+  border: 1px solid rgba(31, 47, 62, 0.16);
+  padding: 8px 10px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #284759;
+  text-align: center;
+  background: rgba(240, 249, 255, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  animation: intro-chip-pop 1.2s ease-in-out infinite;
+}
+
+.mobile-intro-chip:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.mobile-intro-chip:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+.mobile-intro-hint {
+  margin: 0;
+  font-size: 0.86rem;
+  letter-spacing: 0.01em;
+  color: #527083;
+  font-weight: 700;
+  text-align: center;
+  animation: intro-hint-blink 1.1s ease-in-out infinite;
 }
 
 .forgot-password-container {
@@ -261,17 +302,59 @@ async function submit() {
   transform: translateY(8px);
 }
 
-@keyframes dice-pulse {
+@keyframes intro-card-breathe {
+  0% {
+    box-shadow: 0 10px 24px rgba(20, 52, 66, 0.08);
+  }
+
+  50% {
+    box-shadow: 0 16px 34px rgba(20, 52, 66, 0.15);
+  }
+
+  100% {
+    box-shadow: 0 10px 24px rgba(20, 52, 66, 0.08);
+  }
+}
+
+@keyframes intro-art-float {
+  0% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px) scale(1.02);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes intro-chip-pop {
   0% {
     transform: scale(1);
   }
 
   50% {
-    transform: scale(1.08);
+    transform: scale(1.06);
   }
 
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes intro-hint-blink {
+  0% {
+    opacity: 0.58;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.58;
   }
 }
 
@@ -283,6 +366,10 @@ async function submit() {
 
 @media (max-width: 420px) {
   .mobile-intro-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-intro-chip-row {
     grid-template-columns: 1fr;
   }
 }
