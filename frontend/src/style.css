@@ -92,6 +92,10 @@ button {
   .desktop-scale-shell {
     zoom: var(--app-scale);
   }
+
+  .desktop-scale-shell.no-app-scale {
+    zoom: 1;
+  }
 }
 
 @supports not (zoom: 1) {
@@ -99,6 +103,11 @@ button {
     width: calc(100% / var(--app-scale));
     transform: scale(var(--app-scale));
     transform-origin: top center;
+  }
+
+  .desktop-scale-shell.no-app-scale {
+    width: 100%;
+    transform: none;
   }
 }
 
@@ -3811,4 +3820,27 @@ body.pref-high-contrast .pending-log-card {
 .desktop-scale-shell .auth-chat-hero {
   min-height: 640px !important;
   padding: 18px 20px 22px !important;
+}
+
+.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-login-shell {
+  width: min(760px, calc(100% - 16px)) !important;
+}
+
+.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-login-shell .auth-chat-shell {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 12px !important;
+  padding: 14px !important;
+}
+
+.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-login-shell .auth-chat-hero {
+  display: none !important;
+}
+
+.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-login-shell .auth-chat-stage {
+  width: 100%;
+}
+
+.desktop-scale-shell .auth-layout.auth-chat-layout.mobile-login-shell .auth-chat-form-wrap {
+  width: 100%;
+  padding-top: 0 !important;
 }

@@ -1,11 +1,39 @@
 <script setup>
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { RouterView } from "vue-router";
+import { useRoute } from "vue-router";
 
 import thinkingBroIllustration from "../assets/auth/positive-thinking-bro.svg";
+
+const route = useRoute();
+const isMobileViewport = ref(false);
+
+function syncViewportMode() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  isMobileViewport.value = window.innerWidth <= 760;
+}
+
+onMounted(() => {
+  syncViewportMode();
+  window.addEventListener("resize", syncViewportMode);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", syncViewportMode);
+});
+
+const mobileLoginFocus = computed(
+  () => isMobileViewport.value && route.name === "login"
+);
 </script>
 
 <template>
-  <section class="auth-layout auth-chat-layout">
+  <section
+    class="auth-layout auth-chat-layout"
+    :class="{ 'mobile-login-shell': mobileLoginFocus }"
+  >
     <div class="auth-chat-shell">
       <aside class="auth-chat-hero">
         <img

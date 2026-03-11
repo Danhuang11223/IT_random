@@ -1,5 +1,29 @@
 <script setup>
-import { RouterView } from "vue-router";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { RouterView, useRoute } from "vue-router";
+
+const route = useRoute();
+const isMobileViewport = ref(false);
+
+function syncViewportMode() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  isMobileViewport.value = window.innerWidth <= 760;
+}
+
+onMounted(() => {
+  syncViewportMode();
+  window.addEventListener("resize", syncViewportMode);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", syncViewportMode);
+});
+
+const disableScaleForMobileLogin = computed(
+  () => isMobileViewport.value && route.name === "login"
+);
 </script>
 
 <template>
@@ -16,7 +40,7 @@ import { RouterView } from "vue-router";
       <img src="/decor/emoji.svg" class="bg-icon i9" alt="" />
     </div>
 
-    <div class="desktop-scale-shell">
+    <div class="desktop-scale-shell" :class="{ 'no-app-scale': disableScaleForMobileLogin }">
       <RouterView />
     </div>
   </div>
