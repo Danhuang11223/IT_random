@@ -56,19 +56,17 @@ SECRET_KEY = os.getenv(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env_flag("DJANGO_DEBUG", False)
+DEBUG = True
 
-ALLOWED_HOSTS = env_list(
-    "DJANGO_ALLOWED_HOSTS",
-    "127.0.0.1,localhost,testserver",
-)
+ALLOWED_HOSTS = ['*']
+
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 CORS_ALLOWED_ORIGINS = env_list(
     "DJANGO_CORS_ALLOWED_ORIGINS",
     "http://127.0.0.1:5173,http://localhost:5173",
 )
 CORS_ALLOWED_ORIGIN_REGEXES = env_list("DJANGO_CORS_ALLOWED_ORIGIN_REGEXES", "")
-CORS_ALLOW_ALL_ORIGINS = env_flag("DJANGO_CORS_ALLOW_ALL", False)
+CORS_ALLOW_ALL_ORIGINS = True
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
 DEMO_PASSWORD_RESET_LINKS = env_flag("DEMO_PASSWORD_RESET_LINKS", False)
 
