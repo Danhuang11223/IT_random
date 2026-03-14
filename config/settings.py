@@ -60,14 +60,14 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
-CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "https://itrandom.pythonanywhere.com,http://localhost:5173,http://127.0.0.1:5173")
+CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "https://itrandom.pythonanywhere.com,http://localhost:5173,http://127.0.0.1:5173,https://it-random-deploy.vercel.app")
 CORS_ALLOWED_ORIGINS = env_list(
     "DJANGO_CORS_ALLOWED_ORIGINS",
-    "http://127.0.0.1:5173,http://localhost:5173,https://itrandom.pythonanywhere.com",
+    "https://it-random-deploy.vercel.app,http://127.0.0.1:5173,http://localhost:5173,https://itrandom.pythonanywhere.com",
 )
 CORS_ALLOWED_ORIGIN_REGEXES = env_list("DJANGO_CORS_ALLOWED_ORIGIN_REGEXES", "")
 CORS_ALLOW_ALL_ORIGINS = True
-FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://itrandom.pythonanywhere.com").rstrip("/")
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://it-random-deploy.vercel.app").rstrip("/")
 DEMO_PASSWORD_RESET_LINKS = env_flag("DEMO_PASSWORD_RESET_LINKS", False)
 
 
