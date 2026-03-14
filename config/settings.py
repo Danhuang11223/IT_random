@@ -60,13 +60,23 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
-CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "https://itrandom.pythonanywhere.com,http://localhost:5173,http://127.0.0.1:5173,https://it-random-deploy.vercel.app")
-CORS_ALLOWED_ORIGINS = env_list(
-    "DJANGO_CORS_ALLOWED_ORIGINS",
-    "https://it-random-deploy.vercel.app,http://127.0.0.1:5173,http://localhost:5173,https://itrandom.pythonanywhere.com",
-)
+CSRF_TRUSTED_ORIGINS = [
+    "https://itrandom.pythonanywhere.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://it-random-deploy.vercel.app",
+    "https://it-random-deploy-9tpzv5tsz-baolieyaoguos-projects.vercel.app"
+]
+CORS_ALLOWED_ORIGINS = [
+    "https://itrandom.pythonanywhere.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://it-random-deploy.vercel.app",
+    "https://it-random-deploy-9tpzv5tsz-baolieyaoguos-projects.vercel.app"
+]
 CORS_ALLOWED_ORIGIN_REGEXES = env_list("DJANGO_CORS_ALLOWED_ORIGIN_REGEXES", "")
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = True
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://it-random-deploy.vercel.app").rstrip("/")
 DEMO_PASSWORD_RESET_LINKS = env_flag("DEMO_PASSWORD_RESET_LINKS", False)
 
@@ -99,8 +109,9 @@ MIDDLEWARE = [
 ]
 
 if HAS_CORSHEADERS:
-    MIDDLEWARE.insert(1, 'corsheaders.middleware.CorsMiddleware')
+    MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
 
+APPEND_SLASH = False
 if not DEBUG and HAS_WHITENOISE:
     MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
